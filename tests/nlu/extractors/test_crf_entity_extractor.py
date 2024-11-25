@@ -1,23 +1,25 @@
 import copy
 from typing import Dict, Text, List, Any, Callable
 
+import numpy as np
 import pytest
 
 from rasa.engine.graph import ExecutionContext
 from rasa.engine.storage.resource import Resource
 from rasa.engine.storage.storage import ModelStorage
+from rasa.nlu.constants import SPACY_DOCS
+from rasa.nlu.extractors.crf_entity_extractor import (
+    CRFEntityExtractor,
+    CRFEntityExtractorOptions,
+    CRFToken,
+)
 from rasa.nlu.featurizers.dense_featurizer.spacy_featurizer import SpacyFeaturizer
 from rasa.nlu.tokenizers.spacy_tokenizer import SpacyTokenizer
-from rasa.nlu.constants import SPACY_DOCS
 from rasa.nlu.tokenizers.whitespace_tokenizer import WhitespaceTokenizer
 from rasa.nlu.utils.spacy_utils import SpacyModel, SpacyNLP
 from rasa.shared.importers.rasa import RasaFileImporter
 from rasa.shared.nlu.constants import TEXT, ENTITIES
 from rasa.shared.nlu.training_data.message import Message
-from rasa.nlu.extractors.crf_entity_extractor import (
-    CRFEntityExtractor,
-    CRFEntityExtractorOptions,
-)
 
 
 @pytest.fixture()
@@ -204,7 +206,7 @@ def test_crf_use_dense_features(
     spacy_featurizer.process([message])
 
     text_data = crf_extractor._convert_to_crf_tokens(message)
-    features = crf_extractor._crf_tokens_to_features(text_data)
+    features = crf_extractor._crf_tokens_to_features(text_data, component_config)
 
     assert "0:text_dense_features" in features[0]
     dense_features, _ = message.get_dense_features(TEXT, [])
@@ -249,3 +251,110 @@ def test_process_unfeaturized_input(
 
     assert processed_message.get(TEXT) == message_text
     assert processed_message.get(ENTITIES) == []
+
+
+@pytest.fixture
+def sample_data():
+    return {
+        "text": "apple",
+        "pos_tag": "NOUN",
+        "pattern": {"length": 5, "is_capitalized": False},
+        "dense_features": np.array([0.1, 0.2, 0.3]),
+        "entity_tag": "B-FOOD",
+        "entity_role_tag": "INGREDIENT",
+        "entity_group_tag": "ITEM",
+    }
+
+
+@pytest.fixture
+def sample_token(sample_data):
+    return CRFToken(
+        sample_data["text"],
+        sample_data["pos_tag"],
+        sample_data["pattern"],
+        sample_data["dense_features"],
+        sample_data["entity_tag"],
+        sample_data["entity_role_tag"],
+        sample_data["entity_group_tag"],
+    )
+
+
+def test_crf_token_to_dict(sample_data, sample_token):
+    token_dict = sample_token.to_dict()
+
+    assert token_dict["text"] == sample_data["text"]
+    assert token_dict["pos_tag"] == sample_data["pos_tag"]
+    assert token_dict["pattern"] == sample_data["pattern"]
+    assert token_dict["dense_features"] == [
+        str(x) for x in sample_data["dense_features"]
+    ]
+    assert token_dict["entity_tag"] == sample_data["entity_tag"]
+    assert token_dict["entity_role_tag"] == sample_data["entity_role_tag"]
+    assert token_dict["entity_group_tag"] == sample_data["entity_group_tag"]
+
+
+def test_crf_token_create_from_dict(sample_data):
+    dict_data = {
+        "text": sample_data["text"],
+        "pos_tag": sample_data["pos_tag"],
+        "pattern": sample_data["pattern"],
+        "dense_features": [str(x) for x in sample_data["dense_features"]],
+        "entity_tag": sample_data["entity_tag"],
+        "entity_role_tag": sample_data["entity_role_tag"],
+        "entity_group_tag": sample_data["entity_group_tag"],
+    }
+
+    token = CRFToken.create_from_dict(dict_data)
+
+    assert token.text == sample_data["text"]
+    assert token.pos_tag == sample_data["pos_tag"]
+    assert token.pattern == sample_data["pattern"]
+    np.testing.assert_array_equal(token.dense_features, sample_data["dense_features"])
+    assert token.entity_tag == sample_data["entity_tag"]
+    assert token.entity_role_tag == sample_data["entity_role_tag"]
+    assert token.entity_group_tag == sample_data["entity_group_tag"]
+
+
+def test_crf_token_roundtrip_conversion(sample_token):
+    token_dict = sample_token.to_dict()
+    new_token = CRFToken.create_from_dict(token_dict)
+
+    assert new_token.text == sample_token.text
+    assert new_token.pos_tag == sample_token.pos_tag
+    assert new_token.pattern == sample_token.pattern
+    np.testing.assert_array_equal(new_token.dense_features, sample_token.dense_features)
+    assert new_token.entity_tag == sample_token.entity_tag
+    assert new_token.entity_role_tag == sample_token.entity_role_tag
+    assert new_token.entity_group_tag == sample_token.entity_group_tag
+
+
+def test_crf_token_empty_dense_features(sample_data):
+    sample_data["dense_features"] = np.array([])
+    token = CRFToken(
+        sample_data["text"],
+        sample_data["pos_tag"],
+        sample_data["pattern"],
+        sample_data["dense_features"],
+        sample_data["entity_tag"],
+        sample_data["entity_role_tag"],
+        sample_data["entity_group_tag"],
+    )
+    token_dict = token.to_dict()
+    new_token = CRFToken.create_from_dict(token_dict)
+    np.testing.assert_array_equal(new_token.dense_features, np.array([]))
+
+
+def test_crf_token_empty_pattern(sample_data):
+    sample_data["pattern"] = {}
+    token = CRFToken(
+        sample_data["text"],
+        sample_data["pos_tag"],
+        sample_data["pattern"],
+        sample_data["dense_features"],
+        sample_data["entity_tag"],
+        sample_data["entity_role_tag"],
+        sample_data["entity_group_tag"],
+    )
+    token_dict = token.to_dict()
+    new_token = CRFToken.create_from_dict(token_dict)
+    assert new_token.pattern == {}

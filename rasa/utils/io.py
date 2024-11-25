@@ -2,7 +2,6 @@ import asyncio
 import filecmp
 import logging
 import os
-import pickle
 import tempfile
 import warnings
 import re
@@ -81,29 +80,6 @@ def enable_async_loop_debugging(
     return event_loop
 
 
-def pickle_dump(filename: Union[Text, Path], obj: Any) -> None:
-    """Saves object to file.
-
-    Args:
-        filename: the filename to save the object to
-        obj: the object to store
-    """
-    with open(filename, "wb") as f:
-        pickle.dump(obj, f)
-
-
-def pickle_load(filename: Union[Text, Path]) -> Any:
-    """Loads an object from a file.
-
-    Args:
-        filename: the filename to load the object from
-
-    Returns: the loaded object
-    """
-    with open(filename, "rb") as f:
-        return pickle.load(f)
-
-
 def create_temporary_file(data: Any, suffix: Text = "", mode: Text = "w+") -> Text:
     """Creates a tempfile.NamedTemporaryFile object for data."""
     encoding = None if "b" in mode else rasa.shared.utils.io.DEFAULT_ENCODING
@@ -173,48 +149,6 @@ def create_validator(
                 raise ValidationError(message=error_message)
 
     return FunctionValidator
-
-
-def json_unpickle(
-    file_name: Union[Text, Path], encode_non_string_keys: bool = False
-) -> Any:
-    """Unpickle an object from file using json.
-
-    Args:
-        file_name: the file to load the object from
-        encode_non_string_keys: If set to `True` then jsonpickle will encode non-string
-          dictionary keys instead of coercing them into strings via `repr()`.
-
-    Returns: the object
-    """
-    import jsonpickle.ext.numpy as jsonpickle_numpy
-    import jsonpickle
-
-    jsonpickle_numpy.register_handlers()
-
-    file_content = rasa.shared.utils.io.read_file(file_name)
-    return jsonpickle.loads(file_content, keys=encode_non_string_keys)
-
-
-def json_pickle(
-    file_name: Union[Text, Path], obj: Any, encode_non_string_keys: bool = False
-) -> None:
-    """Pickle an object to a file using json.
-
-    Args:
-        file_name: the file to store the object to
-        obj: the object to store
-        encode_non_string_keys: If set to `True` then jsonpickle will encode non-string
-          dictionary keys instead of coercing them into strings via `repr()`.
-    """
-    import jsonpickle.ext.numpy as jsonpickle_numpy
-    import jsonpickle
-
-    jsonpickle_numpy.register_handlers()
-
-    rasa.shared.utils.io.write_text_file(
-        jsonpickle.dumps(obj, keys=encode_non_string_keys), file_name
-    )
 
 
 def get_emoji_regex() -> Pattern:

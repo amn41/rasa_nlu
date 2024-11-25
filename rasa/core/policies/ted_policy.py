@@ -1,15 +1,15 @@
 from __future__ import annotations
-import logging
 
-from rasa.engine.recipes.default_recipe import DefaultV1Recipe
+import logging
 from pathlib import Path
 from collections import defaultdict
 import contextlib
+from typing import Any, List, Optional, Text, Dict, Tuple, Union, Type
 
 import numpy as np
 import tensorflow as tf
-from typing import Any, List, Optional, Text, Dict, Tuple, Union, Type
 
+from rasa.engine.recipes.default_recipe import DefaultV1Recipe
 from rasa.engine.graph import ExecutionContext
 from rasa.engine.storage.resource import Resource
 from rasa.engine.storage.storage import ModelStorage
@@ -49,18 +49,22 @@ from rasa.shared.core.generator import TrackerWithCachedStates
 from rasa.shared.core.events import EntitiesAdded, Event
 from rasa.shared.core.domain import Domain
 from rasa.shared.nlu.training_data.message import Message
-from rasa.shared.nlu.training_data.features import Features
+from rasa.shared.nlu.training_data.features import (
+    Features,
+    save_features,
+    load_features,
+)
 import rasa.shared.utils.io
 import rasa.utils.io
 from rasa.utils import train_utils
+from rasa.utils.tensorflow.feature_array import (
+    FeatureArray,
+    serialize_nested_feature_arrays,
+    deserialize_nested_feature_arrays,
+)
 from rasa.utils.tensorflow.models import RasaModel, TransformerRasaModel
 from rasa.utils.tensorflow import rasa_layers
-from rasa.utils.tensorflow.model_data import (
-    RasaModelData,
-    FeatureSignature,
-    FeatureArray,
-    Data,
-)
+from rasa.utils.tensorflow.model_data import RasaModelData, FeatureSignature, Data
 from rasa.utils.tensorflow.model_data_utils import convert_to_data_format
 from rasa.utils.tensorflow.constants import (
     LABEL,
@@ -961,22 +965,32 @@ class TEDPolicy(Policy):
             model_path: Path where model is to be persisted
         """
         model_filename = self._metadata_filename()
-        rasa.utils.io.json_pickle(
-            model_path / f"{model_filename}.priority.pkl", self.priority
+        rasa.shared.utils.io.dump_obj_as_json_to_file(
+            model_path / f"{model_filename}.priority.json", self.priority
         )
-        rasa.utils.io.pickle_dump(
-            model_path / f"{model_filename}.meta.pkl", self.config
+        rasa.shared.utils.io.dump_obj_as_json_to_file(
+            model_path / f"{model_filename}.meta.json", self.config
         )
-        rasa.utils.io.pickle_dump(
-            model_path / f"{model_filename}.data_example.pkl", self.data_example
+        # save data example
+        serialize_nested_feature_arrays(
+            self.data_example,
+            str(model_path / f"{model_filename}.data_example.st"),
+            str(model_path / f"{model_filename}.data_example_metadata.json"),
         )
-        rasa.utils.io.pickle_dump(
-            model_path / f"{model_filename}.fake_features.pkl", self.fake_features
-        )
-        rasa.utils.io.pickle_dump(
-            model_path / f"{model_filename}.label_data.pkl",
+        # save label data
+        serialize_nested_feature_arrays(
             dict(self._label_data.data) if self._label_data is not None else {},
+            str(model_path / f"{model_filename}.label_data.st"),
+            str(model_path / f"{model_filename}.label_data_metadata.json"),
         )
+        # save fake features
+        metadata = save_features(
+            self.fake_features, str(model_path / f"{model_filename}.fake_features.st")
+        )
+        rasa.shared.utils.io.dump_obj_as_json_to_file(
+            model_path / f"{model_filename}.fake_features_metadata.json", metadata
+        )
+
         entity_tag_specs = (
             [tag_spec._asdict() for tag_spec in self._entity_tag_specs]
             if self._entity_tag_specs
@@ -994,18 +1008,29 @@ class TEDPolicy(Policy):
             model_path: Path where model is to be persisted.
         """
         tf_model_file = model_path / f"{cls._metadata_filename()}.tf_model"
-        loaded_data = rasa.utils.io.pickle_load(
-            model_path / f"{cls._metadata_filename()}.data_example.pkl"
+
+        # load data example
+        loaded_data = deserialize_nested_feature_arrays(
+            str(model_path / f"{cls._metadata_filename()}.data_example.st"),
+            str(model_path / f"{cls._metadata_filename()}.data_example_metadata.json"),
         )
-        label_data = rasa.utils.io.pickle_load(
-            model_path / f"{cls._metadata_filename()}.label_data.pkl"
+        # load label data
+        loaded_label_data = deserialize_nested_feature_arrays(
+            str(model_path / f"{cls._metadata_filename()}.label_data.st"),
+            str(model_path / f"{cls._metadata_filename()}.label_data_metadata.json"),
         )
-        fake_features = rasa.utils.io.pickle_load(
-            model_path / f"{cls._metadata_filename()}.fake_features.pkl"
+        label_data = RasaModelData(data=loaded_label_data)
+
+        # load fake features
+        metadata = rasa.shared.utils.io.read_json_file(
+            model_path / f"{cls._metadata_filename()}.fake_features_metadata.json"
         )
-        label_data = RasaModelData(data=label_data)
-        priority = rasa.utils.io.json_unpickle(
-            model_path / f"{cls._metadata_filename()}.priority.pkl"
+        fake_features = load_features(
+            str(model_path / f"{cls._metadata_filename()}.fake_features.st"), metadata
+        )
+
+        priority = rasa.shared.utils.io.read_json_file(
+            model_path / f"{cls._metadata_filename()}.priority.json"
         )
         entity_tag_specs = rasa.shared.utils.io.read_json_file(
             model_path / f"{cls._metadata_filename()}.entity_tag_specs.json"
@@ -1023,8 +1048,8 @@ class TEDPolicy(Policy):
             )
             for tag_spec in entity_tag_specs
         ]
-        model_config = rasa.utils.io.pickle_load(
-            model_path / f"{cls._metadata_filename()}.meta.pkl"
+        model_config = rasa.shared.utils.io.read_json_file(
+            model_path / f"{cls._metadata_filename()}.meta.json"
         )
 
         return {
@@ -1070,7 +1095,7 @@ class TEDPolicy(Policy):
     ) -> TEDPolicy:
         featurizer = TrackerFeaturizer.load(model_path)
 
-        if not (model_path / f"{cls._metadata_filename()}.data_example.pkl").is_file():
+        if not (model_path / f"{cls._metadata_filename()}.data_example.st").is_file():
             return cls(
                 config,
                 model_storage,

@@ -4,9 +4,9 @@ from collections import OrderedDict
 from enum import Enum
 import logging
 import typing
+from typing import Any, Dict, List, Optional, Text, Tuple, Callable, Type
 
 import numpy as np
-from typing import Any, Dict, List, Optional, Text, Tuple, Callable, Type
 
 import rasa.nlu.utils.bilou_utils as bilou_utils
 import rasa.shared.utils.io
@@ -41,6 +41,9 @@ if typing.TYPE_CHECKING:
     from sklearn_crfsuite import CRF
 
 
+CONFIG_FEATURES = "features"
+
+
 class CRFToken:
     def __init__(
         self,
@@ -59,6 +62,29 @@ class CRFToken:
         self.entity_tag = entity_tag
         self.entity_role_tag = entity_role_tag
         self.entity_group_tag = entity_group_tag
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "text": self.text,
+            "pos_tag": self.pos_tag,
+            "pattern": self.pattern,
+            "dense_features": [str(x) for x in list(self.dense_features)],
+            "entity_tag": self.entity_tag,
+            "entity_role_tag": self.entity_role_tag,
+            "entity_group_tag": self.entity_group_tag,
+        }
+
+    @classmethod
+    def create_from_dict(cls, data: Dict[str, Any]) -> "CRFToken":
+        return cls(
+            data["text"],
+            data["pos_tag"],
+            data["pattern"],
+            np.array([float(x) for x in data["dense_features"]]),
+            data["entity_tag"],
+            data["entity_role_tag"],
+            data["entity_group_tag"],
+        )
 
 
 class CRFEntityExtractorOptions(str, Enum):
@@ -90,7 +116,7 @@ class CRFEntityExtractor(GraphComponent, EntityExtractorMixin):
 
     CONFIG_FEATURES = "features"
 
-    function_dict: Dict[Text, Callable[[CRFToken], Any]] = {
+    function_dict: Dict[Text, Callable[[CRFToken], Any]] = {  # noqa: RUF012
         CRFEntityExtractorOptions.LOW: lambda crf_token: crf_token.text.lower(),
         CRFEntityExtractorOptions.TITLE: lambda crf_token: crf_token.text.istitle(),
         CRFEntityExtractorOptions.PREFIX5: lambda crf_token: crf_token.text[:5],
@@ -137,7 +163,7 @@ class CRFEntityExtractor(GraphComponent, EntityExtractorMixin):
             # "is the preceding token in title case?"
             # POS features require SpacyTokenizer
             # pattern feature require RegexFeaturizer
-            CRFEntityExtractor.CONFIG_FEATURES: [
+            CONFIG_FEATURES: [
                 [
                     CRFEntityExtractorOptions.LOW,
                     CRFEntityExtractorOptions.TITLE,
@@ -200,7 +226,7 @@ class CRFEntityExtractor(GraphComponent, EntityExtractorMixin):
         )
 
     def _validate_configuration(self) -> None:
-        if len(self.component_config.get(self.CONFIG_FEATURES, [])) % 2 != 1:
+        if len(self.component_config.get(CONFIG_FEATURES, [])) % 2 != 1:
             raise ValueError(
                 "Need an odd number of crf feature lists to have a center word."
             )
@@ -251,9 +277,11 @@ class CRFEntityExtractor(GraphComponent, EntityExtractorMixin):
         ]
         dataset = [self._convert_to_crf_tokens(example) for example in entity_examples]
 
-        self._train_model(dataset)
+        self.entity_taggers = self.train_model(
+            dataset, self.component_config, self.crf_order
+        )
 
-        self.persist()
+        self.persist(dataset)
 
         return self._resource
 
@@ -299,7 +327,9 @@ class CRFEntityExtractor(GraphComponent, EntityExtractorMixin):
             if include_tag_features:
                 self._add_tag_to_crf_token(crf_tokens, predictions)
 
-            features = self._crf_tokens_to_features(crf_tokens, include_tag_features)
+            features = self._crf_tokens_to_features(
+                crf_tokens, self.component_config, include_tag_features
+            )
             predictions[tag_name] = entity_tagger.predict_marginals_single(features)
 
         # convert predictions into a list of tags and a list of confidences
@@ -389,27 +419,25 @@ class CRFEntityExtractor(GraphComponent, EntityExtractorMixin):
         **kwargs: Any,
     ) -> CRFEntityExtractor:
         """Loads trained component (see parent class for full docstring)."""
-        import joblib
-
         try:
-            entity_taggers = OrderedDict()
             with model_storage.read_from(resource) as model_dir:
-                # We have to load in the same order as we persisted things as otherwise
-                # the predictions might be off
-                file_names = sorted(model_dir.glob("**/*.pkl"))
-                if not file_names:
-                    logger.debug(
-                        "Failed to load model for 'CRFEntityExtractor'. "
-                        "Maybe you did not provide enough training data and "
-                        "no model was trained."
-                    )
-                    return cls(config, model_storage, resource)
+                dataset = rasa.shared.utils.io.read_json_file(
+                    model_dir / "crf_dataset.json"
+                )
+                crf_order = rasa.shared.utils.io.read_json_file(
+                    model_dir / "crf_order.json"
+                )
 
-                for file_name in file_names:
-                    name = file_name.stem[1:]
-                    entity_taggers[name] = joblib.load(file_name)
+                dataset = [
+                    [CRFToken.create_from_dict(token_data) for token_data in sub_list]
+                    for sub_list in dataset
+                ]
 
-                return cls(config, model_storage, resource, entity_taggers)
+                entity_taggers = cls.train_model(dataset, config, crf_order)
+
+                entity_extractor = cls(config, model_storage, resource, entity_taggers)
+                entity_extractor.crf_order = crf_order
+                return entity_extractor
         except ValueError:
             logger.warning(
                 f"Failed to load {cls.__name__} from model storage. Resource "
@@ -417,23 +445,29 @@ class CRFEntityExtractor(GraphComponent, EntityExtractorMixin):
             )
             return cls(config, model_storage, resource)
 
-    def persist(self) -> None:
+    def persist(self, dataset: List[List[CRFToken]]) -> None:
         """Persist this model into the passed directory."""
-        import joblib
-
         with self._model_storage.write_to(self._resource) as model_dir:
-            if self.entity_taggers:
-                for idx, (name, entity_tagger) in enumerate(
-                    self.entity_taggers.items()
-                ):
-                    model_file_name = model_dir / f"{idx}{name}.pkl"
-                    joblib.dump(entity_tagger, model_file_name)
+            data_to_store = [
+                [token.to_dict() for token in sub_list] for sub_list in dataset
+            ]
 
+            rasa.shared.utils.io.dump_obj_as_json_to_file(
+                model_dir / "crf_dataset.json", data_to_store
+            )
+            rasa.shared.utils.io.dump_obj_as_json_to_file(
+                model_dir / "crf_order.json", self.crf_order
+            )
+
+    @classmethod
     def _crf_tokens_to_features(
-        self, crf_tokens: List[CRFToken], include_tag_features: bool = False
+        cls,
+        crf_tokens: List[CRFToken],
+        config: Dict[str, Any],
+        include_tag_features: bool = False,
     ) -> List[Dict[Text, Any]]:
         """Convert the list of tokens into discrete features."""
-        configured_features = self.component_config[self.CONFIG_FEATURES]
+        configured_features = config[CONFIG_FEATURES]
         sentence_features = []
 
         for token_idx in range(len(crf_tokens)):
@@ -444,28 +478,31 @@ class CRFEntityExtractor(GraphComponent, EntityExtractorMixin):
             half_window_size = window_size // 2
             window_range = range(-half_window_size, half_window_size + 1)
 
-            token_features = self._create_features_for_token(
+            token_features = cls._create_features_for_token(
                 crf_tokens,
                 token_idx,
                 half_window_size,
                 window_range,
                 include_tag_features,
+                config,
             )
 
             sentence_features.append(token_features)
 
         return sentence_features
 
+    @classmethod
     def _create_features_for_token(
-        self,
+        cls,
         crf_tokens: List[CRFToken],
         token_idx: int,
         half_window_size: int,
         window_range: range,
         include_tag_features: bool,
+        config: Dict[str, Any],
     ) -> Dict[Text, Any]:
         """Convert a token into discrete features including words before and after."""
-        configured_features = self.component_config[self.CONFIG_FEATURES]
+        configured_features = config[CONFIG_FEATURES]
         prefixes = [str(i) for i in window_range]
 
         token_features = {}
@@ -505,13 +542,13 @@ class CRFEntityExtractor(GraphComponent, EntityExtractorMixin):
                         # set in the training data, 'matched' is either 'True' or
                         # 'False' depending on whether the token actually matches the
                         # pattern or not
-                        regex_patterns = self.function_dict[feature](token)
+                        regex_patterns = cls.function_dict[feature](token)
                         for pattern_name, matched in regex_patterns.items():
                             token_features[
                                 f"{prefix}:{feature}:{pattern_name}"
                             ] = matched
                     else:
-                        value = self.function_dict[feature](token)
+                        value = cls.function_dict[feature](token)
                         token_features[f"{prefix}:{feature}"] = value
 
         return token_features
@@ -635,38 +672,46 @@ class CRFEntityExtractor(GraphComponent, EntityExtractorMixin):
 
         return tags
 
-    def _train_model(self, df_train: List[List[CRFToken]]) -> None:
+    @classmethod
+    def train_model(
+        cls,
+        df_train: List[List[CRFToken]],
+        config: Dict[str, Any],
+        crf_order: List[str],
+    ) -> OrderedDict[str, CRF]:
         """Train the crf tagger based on the training data."""
         import sklearn_crfsuite
 
-        self.entity_taggers = OrderedDict()
+        entity_taggers = OrderedDict()
 
-        for tag_name in self.crf_order:
+        for tag_name in crf_order:
             logger.debug(f"Training CRF for '{tag_name}'.")
 
             # add entity tag features for second level CRFs
             include_tag_features = tag_name != ENTITY_ATTRIBUTE_TYPE
             X_train = (
-                self._crf_tokens_to_features(sentence, include_tag_features)
+                cls._crf_tokens_to_features(sentence, config, include_tag_features)
                 for sentence in df_train
             )
             y_train = (
-                self._crf_tokens_to_tags(sentence, tag_name) for sentence in df_train
+                cls._crf_tokens_to_tags(sentence, tag_name) for sentence in df_train
             )
 
             entity_tagger = sklearn_crfsuite.CRF(
                 algorithm="lbfgs",
                 # coefficient for L1 penalty
-                c1=self.component_config["L1_c"],
+                c1=config["L1_c"],
                 # coefficient for L2 penalty
-                c2=self.component_config["L2_c"],
+                c2=config["L2_c"],
                 # stop earlier
-                max_iterations=self.component_config["max_iterations"],
+                max_iterations=config["max_iterations"],
                 # include transitions that are possible, but not observed
                 all_possible_transitions=True,
             )
             entity_tagger.fit(X_train, y_train)
 
-            self.entity_taggers[tag_name] = entity_tagger
+            entity_taggers[tag_name] = entity_tagger
 
             logger.debug("Training finished.")
+
+        return entity_taggers

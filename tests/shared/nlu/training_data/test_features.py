@@ -1,17 +1,56 @@
 import itertools
+import os
+import tempfile
+from pathlib import Path
 from typing import Optional, Text, List, Dict, Tuple, Any
 
 import numpy as np
 import pytest
 import scipy.sparse
 
-from rasa.shared.nlu.training_data.features import Features
 from rasa.shared.nlu.constants import (
     FEATURE_TYPE_SENTENCE,
     FEATURE_TYPE_SEQUENCE,
     TEXT,
     INTENT,
 )
+from rasa.shared.nlu.training_data.features import (
+    Features,
+    FeatureMetadata,
+    save_features,
+    load_features,
+)
+
+
+@pytest.fixture
+def safe_tensors_tmp_file() -> str:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".safetensors") as f:
+        yield f.name
+    os.unlink(f.name)
+
+
+@pytest.fixture
+def dense_features() -> Features:
+    features_matrix = np.array([[1, 2, 3], [4, 5, 6]])
+    return Features(
+        features=features_matrix,
+        feature_type="dense",
+        attribute="test",
+        origin="test_origin",
+    )
+
+
+@pytest.fixture
+def sparse_features() -> Features:
+    features_matrix = scipy.sparse.csr_matrix(
+        ([1, 2, 3], ([0, 1, 1], [0, 1, 2])), shape=(2, 3)
+    )
+    return Features(
+        features=features_matrix,
+        feature_type="sparse",
+        attribute="test",
+        origin="test_origin",
+    )
 
 
 @pytest.mark.parametrize(
@@ -181,6 +220,7 @@ def _generate_feature_list_and_modifications(
     instantiate `Features` that differ from the aforementioned list of features in
     exactly one property (i.e. type, sequence length (if the given `type` is
     sequence type only), attribute, origin)
+
     Args:
         is_sparse: whether all features should be sparse
         type: the type to be used for all features
@@ -190,7 +230,6 @@ def _generate_feature_list_and_modifications(
       a list of kwargs dictionaries that can be used to instantiate `Features` that
       differ from the aforementioned list of features in exactly one property
     """
-
     seq_len = 3
     first_dim = 1 if type == FEATURE_TYPE_SENTENCE else 3
 
@@ -467,3 +506,179 @@ def test_reduce_raises_if_combining_different_origins_or_attributes(differ: Text
         expected_origin = ["origin-1"]
     with pytest.raises(ValueError, match=message):
         Features.reduce(features_list, expected_origins=expected_origin)
+
+
+def test_feature_metadata():
+    metadata = FeatureMetadata(
+        data_type="dense",
+        attribute="text",
+        origin="test",
+        is_sparse=False,
+        shape=(10, 5),
+        safetensors_key="key_0",
+    )
+
+    assert metadata.data_type == "dense"
+    assert metadata.attribute == "text"
+    assert metadata.origin == "test"
+    assert not metadata.is_sparse
+    assert metadata.shape == (10, 5)
+    assert metadata.safetensors_key == "key_0"
+
+
+def test_save_dense_features(safe_tensors_tmp_file: str, dense_features: Features):
+    features_dict = {"test_key": [dense_features]}
+    metadata = save_features(features_dict, safe_tensors_tmp_file)
+
+    assert "test_key" in metadata
+    assert len(metadata["test_key"]) == 1
+    assert metadata["test_key"][0]["data_type"] == "dense"
+    assert metadata["test_key"][0]["shape"] == (2, 3)
+    assert not metadata["test_key"][0]["is_sparse"]
+    assert Path(safe_tensors_tmp_file).exists()
+
+
+def test_save_sparse_features(safe_tensors_tmp_file: str, sparse_features: Features):
+    features_dict = {"test_key": [sparse_features]}
+    metadata = save_features(features_dict, safe_tensors_tmp_file)
+
+    assert "test_key" in metadata
+    assert len(metadata["test_key"]) == 1
+    assert metadata["test_key"][0]["data_type"] == "sparse"
+    assert metadata["test_key"][0]["shape"] == (2, 3)
+    assert metadata["test_key"][0]["is_sparse"]
+    assert Path(safe_tensors_tmp_file).exists()
+
+
+def test_save_mixed_features(
+    safe_tensors_tmp_file: str, dense_features: Features, sparse_features: Features
+):
+    features_dict = {"test_key": [dense_features, sparse_features]}
+    metadata = save_features(features_dict, safe_tensors_tmp_file)
+
+    assert "test_key" in metadata
+    assert len(metadata["test_key"]) == 2
+    assert metadata["test_key"][0]["data_type"] == "dense"
+    assert metadata["test_key"][1]["data_type"] == "sparse"
+    assert Path(safe_tensors_tmp_file).exists()
+
+
+def test_save_multiple_keys(
+    safe_tensors_tmp_file: str, dense_features: Features, sparse_features: Features
+):
+    features_dict = {"dense_key": [dense_features], "sparse_key": [sparse_features]}
+    metadata = save_features(features_dict, safe_tensors_tmp_file)
+
+    assert "dense_key" in metadata
+    assert "sparse_key" in metadata
+    assert metadata["dense_key"][0]["data_type"] == "dense"
+    assert metadata["sparse_key"][0]["data_type"] == "sparse"
+    assert Path(safe_tensors_tmp_file).exists()
+
+
+@pytest.fixture
+def setup_save_load(
+    safe_tensors_tmp_file: str, dense_features: Features, sparse_features: Features
+) -> Tuple[str, Dict[str, Any], Dict[str, List[Features]]]:
+    features_dict = {"dense_key": [dense_features], "sparse_key": [sparse_features]}
+    metadata = save_features(features_dict, safe_tensors_tmp_file)
+    return safe_tensors_tmp_file, metadata, features_dict
+
+
+def test_load_dense_features(
+    setup_save_load: Tuple[str, Dict[str, Any], Dict[str, List[Features]]],
+):
+    temp_file, metadata, original_dict = setup_save_load
+    loaded_dict = load_features(temp_file, metadata)
+
+    assert "dense_key" in loaded_dict
+    assert len(loaded_dict["dense_key"]) == 1
+    assert not loaded_dict["dense_key"][0].is_sparse()
+    np.testing.assert_array_equal(
+        loaded_dict["dense_key"][0].features, original_dict["dense_key"][0].features
+    )
+
+
+def test_load_sparse_features(
+    setup_save_load: Tuple[str, Dict[str, Any], Dict[str, List[Features]]],
+):
+    temp_file, metadata, original_dict = setup_save_load
+    loaded_dict = load_features(temp_file, metadata)
+
+    assert "sparse_key" in loaded_dict
+    assert len(loaded_dict["sparse_key"]) == 1
+    assert loaded_dict["sparse_key"][0].is_sparse()
+    assert (
+        loaded_dict["sparse_key"][0].features != original_dict["sparse_key"][0].features
+    ).nnz == 0
+
+
+def test_load_preserves_metadata(
+    setup_save_load: Tuple[str, Dict[str, Any], Dict[str, List[Features]]],
+):
+    temp_file, metadata, original_dict = setup_save_load
+    loaded_dict = load_features(temp_file, metadata)
+
+    for key in original_dict:
+        for orig_feat, loaded_feat in zip(original_dict[key], loaded_dict[key]):
+            assert orig_feat.type == loaded_feat.type
+            assert orig_feat.attribute == loaded_feat.attribute
+            assert orig_feat.origin == loaded_feat.origin
+
+
+def test_load_nonexistent_file():
+    with pytest.raises(Exception):
+        load_features("nonexistent.safetensors", {})
+
+
+def test_load_invalid_metadata(safe_tensors_tmp_file: str, dense_features: Features):
+    features_dict = {"test_key": [dense_features]}
+    metadata = save_features(features_dict, safe_tensors_tmp_file)
+
+    # Corrupt the metadata
+    metadata["test_key"][0]["safetensors_key"] = "invalid_key"
+
+    with pytest.raises(Exception):
+        load_features(safe_tensors_tmp_file, metadata)
+
+
+def test_end_to_end(safe_tensors_tmp_file: str):
+    # Create test data
+    dense_matrix = np.array([[1, 2], [3, 4]])
+    sparse_matrix = scipy.sparse.csr_matrix(([1, 2], ([0, 1], [0, 1])), shape=(2, 2))
+
+    features_dict = {
+        "group1": [
+            Features(dense_matrix, "dense", "test1", "origin1"),
+            Features(sparse_matrix, "sparse", "test2", "origin2"),
+        ],
+        "group2": [
+            Features(dense_matrix * 2, "dense", "test3", ["origin3", "origin4"])
+        ],
+    }
+
+    # Save features
+    metadata = save_features(features_dict, safe_tensors_tmp_file)
+
+    # Load features
+    loaded_dict = load_features(safe_tensors_tmp_file, metadata)
+
+    # Verify structure
+    assert set(loaded_dict.keys()) == set(features_dict.keys())
+    assert len(loaded_dict["group1"]) == 2
+    assert len(loaded_dict["group2"]) == 1
+
+    # Verify dense features
+    np.testing.assert_array_equal(
+        loaded_dict["group1"][0].features, features_dict["group1"][0].features
+    )
+
+    # Verify sparse features
+    assert (
+        loaded_dict["group1"][1].features != features_dict["group1"][1].features
+    ).nnz == 0
+
+    # Verify metadata
+    assert loaded_dict["group1"][0].type == "dense"
+    assert loaded_dict["group1"][1].type == "sparse"
+    assert loaded_dict["group2"][0].origin == ["origin3", "origin4"]

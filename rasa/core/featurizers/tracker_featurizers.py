@@ -1,11 +1,9 @@
 from __future__ import annotations
-from pathlib import Path
-from collections import defaultdict
-from abc import abstractmethod
-import jsonpickle
-import logging
 
-from tqdm import tqdm
+import logging
+from abc import abstractmethod
+from collections import defaultdict
+from pathlib import Path
 from typing import (
     Tuple,
     List,
@@ -18,25 +16,30 @@ from typing import (
     Set,
     DefaultDict,
     cast,
+    Type,
+    Callable,
+    ClassVar,
 )
-import numpy as np
 
-from rasa.core.featurizers.single_state_featurizer import SingleStateFeaturizer
-from rasa.core.featurizers.precomputation import MessageContainerForCoreFeaturization
-from rasa.core.exceptions import InvalidTrackerFeaturizerUsageError
+import numpy as np
+from tqdm import tqdm
+
 import rasa.shared.core.trackers
 import rasa.shared.utils.io
-from rasa.shared.nlu.constants import TEXT, INTENT, ENTITIES, ACTION_NAME
-from rasa.shared.nlu.training_data.features import Features
-from rasa.shared.core.trackers import DialogueStateTracker
-from rasa.shared.core.domain import State, Domain
-from rasa.shared.core.events import Event, ActionExecuted, UserUttered
+from rasa.core.exceptions import InvalidTrackerFeaturizerUsageError
+from rasa.core.featurizers.precomputation import MessageContainerForCoreFeaturization
+from rasa.core.featurizers.single_state_featurizer import SingleStateFeaturizer
 from rasa.shared.core.constants import (
     USER,
     ACTION_UNLIKELY_INTENT_NAME,
     PREVIOUS_ACTION,
 )
+from rasa.shared.core.domain import State, Domain
+from rasa.shared.core.events import Event, ActionExecuted, UserUttered
+from rasa.shared.core.trackers import DialogueStateTracker
 from rasa.shared.exceptions import RasaException
+from rasa.shared.nlu.constants import TEXT, INTENT, ENTITIES, ACTION_NAME
+from rasa.shared.nlu.training_data.features import Features
 from rasa.utils.tensorflow.constants import LABEL_PAD_ID
 from rasa.utils.tensorflow.model_data import ragged_array_to_ndarray
 
@@ -64,6 +67,10 @@ class InvalidStory(RasaException):
 class TrackerFeaturizer:
     """Base class for actual tracker featurizers."""
 
+    # Class registry to store all subclasses
+    _registry: ClassVar[Dict[str, Type["TrackerFeaturizer"]]] = {}
+    _featurizer_type: str = "TrackerFeaturizer"
+
     def __init__(
         self, state_featurizer: Optional[SingleStateFeaturizer] = None
     ) -> None:
@@ -73,6 +80,36 @@ class TrackerFeaturizer:
             state_featurizer: The state featurizer used to encode tracker states.
         """
         self.state_featurizer = state_featurizer
+
+    @classmethod
+    def register(cls, featurizer_type: str) -> Callable:
+        """Decorator to register featurizer subclasses."""
+
+        def wrapper(subclass: Type["TrackerFeaturizer"]) -> Type["TrackerFeaturizer"]:
+            cls._registry[featurizer_type] = subclass
+            # Store the type identifier in the class for serialization
+            subclass._featurizer_type = featurizer_type
+            return subclass
+
+        return wrapper
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "TrackerFeaturizer":
+        """Create featurizer instance from dictionary."""
+        featurizer_type = data.pop("type")
+
+        if featurizer_type not in cls._registry:
+            raise ValueError(f"Unknown featurizer type: {featurizer_type}")
+
+        # Get the correct subclass and instantiate it
+        subclass = cls._registry[featurizer_type]
+        return subclass.create_from_dict(data)
+
+    @classmethod
+    @abstractmethod
+    def create_from_dict(cls, data: Dict[str, Any]) -> "TrackerFeaturizer":
+        """Each subclass must implement its own creation from dict method."""
+        pass
 
     @staticmethod
     def _create_states(
@@ -465,9 +502,7 @@ class TrackerFeaturizer:
             self.state_featurizer.entity_tag_specs = []
 
         # noinspection PyTypeChecker
-        rasa.shared.utils.io.write_text_file(
-            str(jsonpickle.encode(self)), featurizer_file
-        )
+        rasa.shared.utils.io.dump_obj_as_json_to_file(featurizer_file, self.to_dict())
 
     @staticmethod
     def load(path: Union[Text, Path]) -> Optional[TrackerFeaturizer]:
@@ -481,7 +516,17 @@ class TrackerFeaturizer:
         """
         featurizer_file = Path(path) / FEATURIZER_FILE
         if featurizer_file.is_file():
-            return jsonpickle.decode(rasa.shared.utils.io.read_file(featurizer_file))
+            data = rasa.shared.utils.io.read_json_file(featurizer_file)
+
+            if "type" not in data:
+                logger.error(
+                    f"Couldn't load featurizer for policy. "
+                    f"File '{featurizer_file}' does not contain all "
+                    f"necessary information. 'type' is missing."
+                )
+                return None
+
+            return TrackerFeaturizer.from_dict(data)
 
         logger.error(
             f"Couldn't load featurizer for policy. "
@@ -508,7 +553,16 @@ class TrackerFeaturizer:
             )
         ]
 
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "type": self.__class__._featurizer_type,
+            "state_featurizer": (
+                self.state_featurizer.to_dict() if self.state_featurizer else None
+            ),
+        }
 
+
+@TrackerFeaturizer.register("FullDialogueTrackerFeaturizer")
 class FullDialogueTrackerFeaturizer(TrackerFeaturizer):
     """Creates full dialogue training data for time distributed architectures.
 
@@ -646,7 +700,20 @@ class FullDialogueTrackerFeaturizer(TrackerFeaturizer):
 
         return trackers_as_states
 
+    def to_dict(self) -> Dict[str, Any]:
+        return super().to_dict()
 
+    @classmethod
+    def create_from_dict(cls, data: Dict[str, Any]) -> "FullDialogueTrackerFeaturizer":
+        state_featurizer = SingleStateFeaturizer.create_from_dict(
+            data["state_featurizer"]
+        )
+        return cls(
+            state_featurizer,
+        )
+
+
+@TrackerFeaturizer.register("MaxHistoryTrackerFeaturizer")
 class MaxHistoryTrackerFeaturizer(TrackerFeaturizer):
     """Truncates the tracker history into `max_history` long sequences.
 
@@ -887,7 +954,25 @@ class MaxHistoryTrackerFeaturizer(TrackerFeaturizer):
 
         return trackers_as_states
 
+    def to_dict(self) -> Dict[str, Any]:
+        data = super().to_dict()
+        data.update(
+            {
+                "remove_duplicates": self.remove_duplicates,
+                "max_history": self.max_history,
+            }
+        )
+        return data
 
+    @classmethod
+    def create_from_dict(cls, data: Dict[str, Any]) -> "MaxHistoryTrackerFeaturizer":
+        state_featurizer = SingleStateFeaturizer.create_from_dict(
+            data["state_featurizer"]
+        )
+        return cls(state_featurizer, data["max_history"], data["remove_duplicates"])
+
+
+@TrackerFeaturizer.register("IntentMaxHistoryTrackerFeaturizer")
 class IntentMaxHistoryTrackerFeaturizer(MaxHistoryTrackerFeaturizer):
     """Truncates the tracker history into `max_history` long sequences.
 
@@ -1165,6 +1250,18 @@ class IntentMaxHistoryTrackerFeaturizer(MaxHistoryTrackerFeaturizer):
         ]
 
         return trackers_as_states
+
+    def to_dict(self) -> Dict[str, Any]:
+        return super().to_dict()
+
+    @classmethod
+    def create_from_dict(
+        cls, data: Dict[str, Any]
+    ) -> "IntentMaxHistoryTrackerFeaturizer":
+        state_featurizer = SingleStateFeaturizer.create_from_dict(
+            data["state_featurizer"]
+        )
+        return cls(state_featurizer, data["max_history"], data["remove_duplicates"])
 
 
 def _is_prev_action_unlikely_intent_in_state(state: State) -> bool:

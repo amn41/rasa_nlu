@@ -20,6 +20,8 @@ import numpy as np
 import scipy.sparse
 from sklearn.model_selection import train_test_split
 
+from rasa.utils.tensorflow.feature_array import FeatureArray
+
 logger = logging.getLogger(__name__)
 
 
@@ -35,199 +37,6 @@ def ragged_array_to_ndarray(ragged_array: Iterable[np.ndarray]) -> np.ndarray:
         return np.array(ragged_array)
     except ValueError:
         return np.array(ragged_array, dtype=object)
-
-
-class FeatureArray(np.ndarray):
-    """Stores any kind of features ready to be used by a RasaModel.
-
-    Next to the input numpy array of features, it also received the number of
-    dimensions of the features.
-    As our features can have 1 to 4 dimensions we might have different number of numpy
-    arrays stacked. The number of dimensions helps us to figure out how to handle this
-    particular feature array. Also, it is automatically determined whether the feature
-    array is sparse or not and the number of units is determined as well.
-
-    Subclassing np.array: https://numpy.org/doc/stable/user/basics.subclassing.html
-    """
-
-    def __new__(
-        cls, input_array: np.ndarray, number_of_dimensions: int
-    ) -> "FeatureArray":
-        """Create and return a new object.  See help(type) for accurate signature."""
-        FeatureArray._validate_number_of_dimensions(number_of_dimensions, input_array)
-
-        feature_array = np.asarray(input_array).view(cls)
-
-        if number_of_dimensions <= 2:
-            feature_array.units = input_array.shape[-1]
-            feature_array.is_sparse = isinstance(input_array[0], scipy.sparse.spmatrix)
-        elif number_of_dimensions == 3:
-            feature_array.units = input_array[0].shape[-1]
-            feature_array.is_sparse = isinstance(input_array[0], scipy.sparse.spmatrix)
-        elif number_of_dimensions == 4:
-            feature_array.units = input_array[0][0].shape[-1]
-            feature_array.is_sparse = isinstance(
-                input_array[0][0], scipy.sparse.spmatrix
-            )
-        else:
-            raise ValueError(
-                f"Number of dimensions '{number_of_dimensions}' currently not "
-                f"supported."
-            )
-
-        feature_array.number_of_dimensions = number_of_dimensions
-
-        return feature_array
-
-    def __init__(
-        self, input_array: Any, number_of_dimensions: int, **kwargs: Any
-    ) -> None:
-        """Initialize. FeatureArray.
-
-        Needed in order to avoid 'Invalid keyword argument number_of_dimensions
-        to function FeatureArray.__init__ '
-        Args:
-            input_array: the array that contains features
-            number_of_dimensions: number of dimensions in input_array
-        """
-        super().__init__(**kwargs)
-        self.number_of_dimensions = number_of_dimensions
-
-    def __array_finalize__(self, obj: Optional[np.ndarray]) -> None:
-        """This method is called when the system allocates a new array from obj.
-
-        Args:
-            obj: A subclass (subtype) of ndarray.
-        """
-        if obj is None:
-            return
-
-        self.units = getattr(obj, "units", None)
-        self.number_of_dimensions = getattr(obj, "number_of_dimensions", None)  # type: ignore[assignment] # noqa:E501
-        self.is_sparse = getattr(obj, "is_sparse", None)
-
-        default_attributes = {
-            "units": self.units,
-            "number_of_dimensions": self.number_of_dimensions,
-            "is_spare": self.is_sparse,
-        }
-        self.__dict__.update(default_attributes)
-
-    # pytype: disable=attribute-error
-    def __array_ufunc__(
-        self, ufunc: Any, method: Text, *inputs: Any, **kwargs: Any
-    ) -> Any:
-        """Overwrite this method as we are subclassing numpy array.
-
-        Args:
-            ufunc: The ufunc object that was called.
-            method: A string indicating which Ufunc method was called
-                    (one of "__call__", "reduce", "reduceat", "accumulate", "outer",
-                    "inner").
-            *inputs: A tuple of the input arguments to the ufunc.
-            **kwargs: Any additional arguments
-
-        Returns:
-            The result of the operation.
-        """
-        f = {
-            "reduce": ufunc.reduce,
-            "accumulate": ufunc.accumulate,
-            "reduceat": ufunc.reduceat,
-            "outer": ufunc.outer,
-            "at": ufunc.at,
-            "__call__": ufunc,
-        }
-        # convert the inputs to np.ndarray to prevent recursion, call the function,
-        # then cast it back as FeatureArray
-        output = FeatureArray(
-            f[method](*(i.view(np.ndarray) for i in inputs), **kwargs),
-            number_of_dimensions=kwargs["number_of_dimensions"],
-        )
-        output.__dict__ = self.__dict__  # carry forward attributes
-        return output
-
-    def __reduce__(self) -> Tuple[Any, Any, Any]:
-        """Needed in order to pickle this object.
-
-        Returns:
-            A tuple.
-        """
-        pickled_state = super(FeatureArray, self).__reduce__()
-        if isinstance(pickled_state, str):
-            raise TypeError("np array __reduce__ returned string instead of tuple.")
-        new_state = pickled_state[2] + (
-            self.number_of_dimensions,
-            self.is_sparse,
-            self.units,
-        )
-        return pickled_state[0], pickled_state[1], new_state
-
-    def __setstate__(self, state: Any, **kwargs: Any) -> None:
-        """Sets the state.
-
-        Args:
-            state: The state argument must be a sequence that contains the following
-                   elements version, shape, dtype, isFortan, rawdata.
-            **kwargs: Any additional parameter
-        """
-        # Needed in order to load the object
-        self.number_of_dimensions = state[-3]
-        self.is_sparse = state[-2]
-        self.units = state[-1]
-        super(FeatureArray, self).__setstate__(state[0:-3], **kwargs)
-
-    # pytype: enable=attribute-error
-
-    @staticmethod
-    def _validate_number_of_dimensions(
-        number_of_dimensions: int, input_array: np.ndarray
-    ) -> None:
-        """Validates if the the input array has given number of dimensions.
-
-        Args:
-            number_of_dimensions: number of dimensions
-            input_array: input array
-
-        Raises: ValueError in case the dimensions do not match
-        """
-        _sub_array = input_array
-        dim = 0
-        # Go number_of_dimensions into the given input_array
-        for i in range(1, number_of_dimensions + 1):
-            _sub_array = _sub_array[0]
-            if isinstance(_sub_array, scipy.sparse.spmatrix):
-                dim = i
-                break
-            if isinstance(_sub_array, np.ndarray) and _sub_array.shape[0] == 0:
-                # sequence dimension is 0, we are dealing with "fake" features
-                dim = i
-                break
-
-        # If the resulting sub_array is sparse, the remaining number of dimensions
-        # should be at least 2
-        if isinstance(_sub_array, scipy.sparse.spmatrix):
-            if dim > 2:
-                raise ValueError(
-                    f"Given number of dimensions '{number_of_dimensions}' does not "
-                    f"match dimensions of given input array: {input_array}."
-                )
-        elif isinstance(_sub_array, np.ndarray) and _sub_array.shape[0] == 0:
-            # sequence dimension is 0, we are dealing with "fake" features,
-            # but they should be of dim 2
-            if dim > 2:
-                raise ValueError(
-                    f"Given number of dimensions '{number_of_dimensions}' does not "
-                    f"match dimensions of given input array: {input_array}."
-                )
-        # If the resulting sub_array is dense, the sub_array should be a single number
-        elif not np.issubdtype(type(_sub_array), np.integer) and not isinstance(
-            _sub_array, (np.float32, np.float64)
-        ):
-            raise ValueError(
-                f"Given number of dimensions '{number_of_dimensions}' does not match "
-                f"dimensions of given input array: {input_array}."
-            )
 
 
 class FeatureSignature(NamedTuple):
@@ -270,8 +79,7 @@ class RasaModelData:
         label_sub_key: Optional[Text] = None,
         data: Optional[Data] = None,
     ) -> None:
-        """
-        Initializes the RasaModelData object.
+        """Initializes the RasaModelData object.
 
         Args:
             label_key: the key of a label used for balancing, etc.

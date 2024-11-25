@@ -1,7 +1,8 @@
 import logging
+from typing import List, Optional, Dict, Text, Set, Any
+
 import numpy as np
 import scipy.sparse
-from typing import List, Optional, Dict, Text, Set, Any
 
 from rasa.core.featurizers.precomputation import MessageContainerForCoreFeaturization
 from rasa.nlu.extractors.extractor import EntityTagSpec
@@ -361,6 +362,26 @@ class SingleStateFeaturizer:
             self._encode_action(action, precomputations)
             for action in domain.action_names_or_texts
         ]
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "action_texts": self.action_texts,
+            "entity_tag_specs": self.entity_tag_specs,
+            "feature_states": self._default_feature_states,
+        }
+
+    @classmethod
+    def create_from_dict(
+        cls, data: Dict[str, Any]
+    ) -> Optional["SingleStateFeaturizer"]:
+        if not data:
+            return None
+
+        featurizer = SingleStateFeaturizer()
+        featurizer.action_texts = data["action_texts"]
+        featurizer._default_feature_states = data["feature_states"]
+        featurizer.entity_tag_specs = data["entity_tag_specs"]
+        return featurizer
 
 
 class IntentTokenizerSingleStateFeaturizer(SingleStateFeaturizer):

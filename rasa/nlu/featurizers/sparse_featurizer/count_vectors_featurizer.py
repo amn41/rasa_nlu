@@ -1,9 +1,13 @@
 from __future__ import annotations
+
 import logging
 import re
+from typing import Any, Dict, List, Optional, Text, Tuple, Set, Type, Union
+
+import numpy as np
 import scipy.sparse
-from typing import Any, Dict, List, Optional, Text, Tuple, Set, Type
-from rasa.nlu.tokenizers.tokenizer import Tokenizer
+from sklearn.exceptions import NotFittedError
+from sklearn.feature_extraction.text import CountVectorizer
 
 import rasa.shared.utils.io
 from rasa.engine.graph import GraphComponent, ExecutionContext
@@ -23,7 +27,14 @@ from rasa.nlu.constants import (
     MESSAGE_ATTRIBUTES,
     DENSE_FEATURIZABLE_ATTRIBUTES,
 )
+from rasa.nlu.featurizers.sparse_featurizer.sparse_featurizer import SparseFeaturizer
+from rasa.nlu.tokenizers.tokenizer import Tokenizer
+from rasa.nlu.utils.spacy_utils import SpacyModel
+from rasa.shared.constants import DOCS_URL_COMPONENTS
+from rasa.shared.exceptions import RasaException, FileIOException
 from rasa.shared.nlu.constants import TEXT, INTENT, INTENT_RESPONSE_KEY, ACTION_NAME
+from rasa.shared.nlu.training_data.message import Message
+from rasa.shared.nlu.training_data.training_data import TrainingData
 
 BUFFER_SLOTS_PREFIX = "buf_"
 
@@ -686,6 +697,31 @@ class CountVectorsFeaturizer(SparseFeaturizer, GraphComponent):
         """Check if any model got trained."""
         return any(value is not None for value in attribute_vocabularies.values())
 
+    @staticmethod
+    def convert_vocab(
+        vocab: Dict[str, Union[int, Optional[Dict[str, int]]]], to_int: bool
+    ) -> Dict[str, Union[None, int, np.int64, Dict[str, Union[int, np.int64]]]]:
+        """Converts numpy integers in the vocabulary to Python integers."""
+
+        def convert_value(value: int) -> Union[int, np.int64]:
+            """Helper function to convert a single value based on to_int flag."""
+            return int(value) if to_int else np.int64(value)
+
+        result_dict: Dict[
+            str, Union[None, int, np.int64, Dict[str, Union[int, np.int64]]]
+        ] = {}
+        for key, sub_dict in vocab.items():
+            if isinstance(sub_dict, int):
+                result_dict[key] = convert_value(sub_dict)
+            elif not sub_dict:
+                result_dict[key] = None
+            else:
+                result_dict[key] = {
+                    sub_key: convert_value(value) for sub_key, value in sub_dict.items()
+                }
+
+        return result_dict
+
     def persist(self) -> None:
         """Persist this model into the passed directory.
 
@@ -699,17 +735,18 @@ class CountVectorsFeaturizer(SparseFeaturizer, GraphComponent):
             attribute_vocabularies = self._collect_vectorizer_vocabularies()
             if self._is_any_model_trained(attribute_vocabularies):
                 # Definitely need to persist some vocabularies
-                featurizer_file = model_dir / "vocabularies.pkl"
+                featurizer_file = model_dir / "vocabularies.json"
 
                 # Only persist vocabulary from one attribute if `use_shared_vocab`.
                 # Can be loaded and distributed to all attributes.
-                vocab = (
+                loaded_vocab = (
                     attribute_vocabularies[TEXT]
                     if self.use_shared_vocab
                     else attribute_vocabularies
                 )
+                vocab = self.convert_vocab(loaded_vocab, to_int=True)
 
-                io_utils.json_pickle(featurizer_file, vocab)
+                rasa.shared.utils.io.dump_obj_as_json_to_file(featurizer_file, vocab)
 
                 # Dump OOV words separately as they might have been modified during
                 # training
@@ -784,8 +821,9 @@ class CountVectorsFeaturizer(SparseFeaturizer, GraphComponent):
         """Loads trained component (see parent class for full docstring)."""
         try:
             with model_storage.read_from(resource) as model_dir:
-                featurizer_file = model_dir / "vocabularies.pkl"
-                vocabulary = io_utils.json_unpickle(featurizer_file)
+                featurizer_file = model_dir / "vocabularies.json"
+                vocabulary = rasa.shared.utils.io.read_json_file(featurizer_file)
+                vocabulary = cls.convert_vocab(vocabulary, to_int=False)
 
                 share_vocabulary = config["use_shared_vocab"]
 

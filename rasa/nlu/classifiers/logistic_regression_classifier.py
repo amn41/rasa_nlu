@@ -1,20 +1,20 @@
 import logging
 from typing import Any, Text, Dict, List, Type, Tuple
 
-import joblib
+import structlog
 from scipy.sparse import hstack, vstack, csr_matrix
 from sklearn.linear_model import LogisticRegression
 
+from rasa.engine.graph import ExecutionContext, GraphComponent
+from rasa.engine.recipes.default_recipe import DefaultV1Recipe
 from rasa.engine.storage.resource import Resource
 from rasa.engine.storage.storage import ModelStorage
-from rasa.engine.recipes.default_recipe import DefaultV1Recipe
-from rasa.engine.graph import ExecutionContext, GraphComponent
 from rasa.nlu.classifiers import LABEL_RANKING_LENGTH
-from rasa.nlu.featurizers.featurizer import Featurizer
 from rasa.nlu.classifiers.classifier import IntentClassifier
-from rasa.shared.nlu.training_data.training_data import TrainingData
-from rasa.shared.nlu.training_data.message import Message
+from rasa.nlu.featurizers.featurizer import Featurizer
 from rasa.shared.nlu.constants import TEXT, INTENT
+from rasa.shared.nlu.training_data.message import Message
+from rasa.shared.nlu.training_data.training_data import TrainingData
 from rasa.utils.tensorflow.constants import RANKING_LENGTH
 
 logger = logging.getLogger(__name__)
@@ -158,10 +158,13 @@ class LogisticRegressionClassifier(IntentClassifier, GraphComponent):
 
     def persist(self) -> None:
         """Persist this model into the passed directory."""
+        import skops.io as sio
+
         with self._model_storage.write_to(self._resource) as model_dir:
-            path = model_dir / f"{self._resource.name}.joblib"
-            joblib.dump(self.clf, path)
+            path = model_dir / f"{self._resource.name}.skops"
+            sio.dump(self.clf, path)
             logger.debug(f"Saved intent classifier to '{path}'.")
+
 
     @classmethod
     def load(
@@ -173,9 +176,20 @@ class LogisticRegressionClassifier(IntentClassifier, GraphComponent):
         **kwargs: Any,
     ) -> "LogisticRegressionClassifier":
         """Loads trained component (see parent class for full docstring)."""
+        import skops.io as sio
+
         try:
             with model_storage.read_from(resource) as model_dir:
-                classifier = joblib.load(model_dir / f"{resource.name}.joblib")
+                classifier_file = model_dir / f"{resource.name}.skops"
+                unknown_types = sio.get_untrusted_types(file=classifier_file)
+
+                if unknown_types:
+                    logger.debug(
+                        f"Untrusted types ({unknown_types}) found when loading {classifier_file}!",
+                    )
+                    raise ValueError()
+
+                classifier = sio.load(classifier_file, trusted=unknown_types)
                 component = cls(
                     config, execution_context.node_name, model_storage, resource
                 )

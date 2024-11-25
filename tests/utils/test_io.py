@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Dict, Text
+
 import pytest
 from _pytest.tmpdir import TempPathFactory
 from prompt_toolkit.document import Document
@@ -69,22 +69,6 @@ def test_create_validator_from_callable():
         validator.validate(document)
 
     assert e.value.message == error_message
-
-
-@pytest.mark.parametrize(
-    "input,kwargs,expected",
-    [
-        ({(1, 2): 3}, {}, {repr((1, 2)): 3}),
-        ({(1, 2): 3}, {"encode_non_string_keys": True}, {(1, 2): 3}),
-    ],
-)
-def test_write_and_load_dict_via_jsonpickle(
-    tmp_path: Path, input: Dict, kwargs: Dict[Text, bool], expected: Dict
-):
-    file_name = tmp_path / "bla.pkl"
-    rasa.utils.io.json_pickle(file_name=file_name, obj=input, **kwargs)
-    loaded = rasa.utils.io.json_unpickle(file_name=file_name, **kwargs)
-    assert loaded == expected
 
 
 def test_empty_directories_are_equal(tmp_path_factory: TempPathFactory):

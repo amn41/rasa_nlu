@@ -5,6 +5,7 @@ from typing import Any, List, Optional, Text, Dict, Type, Union
 
 import numpy as np
 import tensorflow as tf
+
 import rasa.utils.common
 from rasa.engine.graph import ExecutionContext
 from rasa.engine.recipes.default_recipe import DefaultV1Recipe
@@ -16,6 +17,7 @@ from rasa.shared.core.domain import Domain
 from rasa.shared.core.trackers import DialogueStateTracker
 from rasa.shared.core.constants import SLOTS, ACTIVE_LOOP, ACTION_UNLIKELY_INTENT_NAME
 from rasa.shared.core.events import UserUttered, ActionExecuted
+import rasa.shared.utils.io
 from rasa.shared.nlu.constants import (
     INTENT,
     TEXT,
@@ -103,8 +105,6 @@ from rasa.utils.tensorflow.constants import (
 )
 from rasa.utils.tensorflow import layers
 from rasa.utils.tensorflow.model_data import RasaModelData, FeatureArray, Data
-
-import rasa.utils.io as io_utils
 from rasa.core.exceptions import RasaCoreException
 from rasa.shared.utils import common
 
@@ -881,9 +881,12 @@ class UnexpecTEDIntentPolicy(TEDPolicy):
             model_path: Path where model is to be persisted
         """
         super().persist_model_utilities(model_path)
-        io_utils.pickle_dump(
-            model_path / f"{self._metadata_filename()}.label_quantiles.pkl",
-            self.label_quantiles,
+
+        from safetensors.numpy import save_file
+
+        save_file(
+            {str(k): np.array(v) for k, v in self.label_quantiles.items()},
+            model_path / f"{self._metadata_filename()}.label_quantiles.st",
         )
 
     @classmethod
@@ -894,9 +897,14 @@ class UnexpecTEDIntentPolicy(TEDPolicy):
             model_path: Path where model is to be persisted.
         """
         model_utilties = super()._load_model_utilities(model_path)
-        label_quantiles = io_utils.pickle_load(
-            model_path / f"{cls._metadata_filename()}.label_quantiles.pkl"
+
+        from safetensors.numpy import load_file
+
+        loaded_label_quantiles = load_file(
+            model_path / f"{cls._metadata_filename()}.label_quantiles.st"
         )
+        label_quantiles = {int(k): list(v) for k, v in loaded_label_quantiles.items()}
+
         model_utilties.update({"label_quantiles": label_quantiles})
         return model_utilties
 

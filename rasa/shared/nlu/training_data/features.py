@@ -1,13 +1,131 @@
 from __future__ import annotations
-from typing import Iterable, Union, Text, Optional, List, Any, Tuple, Dict, Set
+
 import itertools
+from dataclasses import dataclass
+from typing import Iterable, Union, Text, Optional, List, Any, Tuple, Dict, Set
 
 import numpy as np
 import scipy.sparse
+from safetensors.numpy import save_file, load_file
 
-import rasa.shared.utils.io
 import rasa.shared.nlu.training_data.util
+import rasa.shared.utils.io
 from rasa.shared.nlu.constants import FEATURE_TYPE_SEQUENCE, FEATURE_TYPE_SENTENCE
+
+
+@dataclass
+class FeatureMetadata:
+    data_type: str
+    attribute: str
+    origin: Union[str, List[str]]
+    is_sparse: bool
+    shape: tuple
+    safetensors_key: str
+
+
+def save_features(
+    features_dict: Dict[Text, List[Features]], file_name: str
+) -> Dict[str, Any]:
+    """Save a dictionary of Features lists to disk using safetensors.
+
+    Args:
+        features_dict: Dictionary mapping strings to lists of Features objects
+        file_name: File to save the features to
+
+    Returns:
+        The metadata to reconstruct the features.
+    """
+    # All tensors are stored in a single safetensors file
+    tensors_to_save = {}
+    # Metadata will be stored separately
+    metadata = {}
+
+    for key, features_list in features_dict.items():
+        feature_metadata_list = []
+
+        for idx, feature in enumerate(features_list):
+            # Create a unique key for this tensor in the safetensors file
+            safetensors_key = f"{key}_{idx}"
+
+            # Convert sparse matrices to dense if needed
+            if feature.is_sparse():
+                # For sparse matrices, use the COO format
+                coo = feature.features.tocoo()  # type:ignore[union-attr]
+                # Save data, row indices and col indices separately
+                tensors_to_save[f"{safetensors_key}_data"] = coo.data
+                tensors_to_save[f"{safetensors_key}_row"] = coo.row
+                tensors_to_save[f"{safetensors_key}_col"] = coo.col
+            else:
+                tensors_to_save[safetensors_key] = feature.features
+
+            # Store metadata
+            metadata_item = FeatureMetadata(
+                data_type=feature.type,
+                attribute=feature.attribute,
+                origin=feature.origin,
+                is_sparse=feature.is_sparse(),
+                shape=feature.features.shape,
+                safetensors_key=safetensors_key,
+            )
+            feature_metadata_list.append(vars(metadata_item))
+
+        metadata[key] = feature_metadata_list
+
+    # Save tensors
+    save_file(tensors_to_save, file_name)
+
+    return metadata
+
+
+def load_features(
+    filename: str, metadata: Dict[str, Any]
+) -> Dict[Text, List[Features]]:
+    """Load Features dictionary from disk.
+
+    Args:
+        filename: File name of the safetensors file.
+        metadata: Metadata to reconstruct the features.
+
+    Returns:
+        Dictionary mapping strings to lists of Features objects
+    """
+    # Load tensors
+    tensors = load_file(filename)
+
+    # Reconstruct the features dictionary
+    features_dict: Dict[Text, List[Features]] = {}
+
+    for key, feature_metadata_list in metadata.items():
+        features_list = []
+
+        for meta in feature_metadata_list:
+            safetensors_key = meta["safetensors_key"]
+
+            if meta["is_sparse"]:
+                # Reconstruct sparse matrix from COO format
+                data = tensors[f"{safetensors_key}_data"]
+                row = tensors[f"{safetensors_key}_row"]
+                col = tensors[f"{safetensors_key}_col"]
+
+                features_matrix = scipy.sparse.coo_matrix(
+                    (data, (row, col)), shape=tuple(meta["shape"])
+                ).tocsr()  # Convert back to CSR format
+            else:
+                features_matrix = tensors[safetensors_key]
+
+            # Reconstruct Features object
+            features = Features(
+                features=features_matrix,
+                feature_type=meta["data_type"],
+                attribute=meta["attribute"],
+                origin=meta["origin"],
+            )
+
+            features_list.append(features)
+
+        features_dict[key] = features_list
+
+    return features_dict
 
 
 class Features:

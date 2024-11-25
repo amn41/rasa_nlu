@@ -1,11 +1,13 @@
 from __future__ import annotations
+
 import logging
 import re
 from typing import Any, Dict, List, Optional, Text, Tuple, Type
+
 import numpy as np
 import scipy.sparse
-from rasa.nlu.tokenizers.tokenizer import Tokenizer
 
+from rasa.nlu.tokenizers.tokenizer import Tokenizer
 import rasa.shared.utils.io
 import rasa.utils.io
 import rasa.nlu.utils.pattern_utils as pattern_utils
@@ -240,7 +242,7 @@ class RegexFeaturizer(SparseFeaturizer, GraphComponent):
 
         try:
             with model_storage.read_from(resource) as model_dir:
-                patterns_file_name = model_dir / "patterns.pkl"
+                patterns_file_name = model_dir / "patterns.json"
                 known_patterns = rasa.shared.utils.io.read_json_file(patterns_file_name)
         except (ValueError, FileNotFoundError):
             logger.warning(
@@ -258,7 +260,7 @@ class RegexFeaturizer(SparseFeaturizer, GraphComponent):
 
     def _persist(self) -> None:
         with self._model_storage.write_to(self._resource) as model_dir:
-            regex_file = model_dir / "patterns.pkl"
+            regex_file = model_dir / "patterns.json"
             rasa.shared.utils.io.dump_obj_as_json_to_file(
                 regex_file, self.known_patterns
             )

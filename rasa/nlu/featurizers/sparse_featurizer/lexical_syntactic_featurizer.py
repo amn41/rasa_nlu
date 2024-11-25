@@ -1,9 +1,7 @@
 from __future__ import annotations
+
 import logging
 from collections import OrderedDict
-
-import scipy.sparse
-import numpy as np
 from typing import (
     Any,
     Dict,
@@ -17,29 +15,33 @@ from typing import (
     Union,
 )
 
+import numpy as np
+import scipy.sparse
+
+import rasa.shared.utils.io
+import rasa.utils.io
 from rasa.engine.graph import ExecutionContext, GraphComponent
 from rasa.engine.recipes.default_recipe import DefaultV1Recipe
 from rasa.engine.storage.resource import Resource
 from rasa.engine.storage.storage import ModelStorage
+from rasa.nlu.constants import TOKENS_NAMES
+from rasa.nlu.featurizers.sparse_featurizer.sparse_featurizer import SparseFeaturizer
 from rasa.nlu.tokenizers.spacy_tokenizer import POS_TAG_KEY, SpacyTokenizer
 from rasa.nlu.tokenizers.tokenizer import Token, Tokenizer
-from rasa.nlu.featurizers.sparse_featurizer.sparse_featurizer import SparseFeaturizer
-from rasa.nlu.constants import TOKENS_NAMES
 from rasa.shared.constants import DOCS_URL_COMPONENTS
-from rasa.shared.nlu.training_data.training_data import TrainingData
-from rasa.shared.nlu.training_data.message import Message
-from rasa.shared.nlu.constants import TEXT
 from rasa.shared.exceptions import InvalidConfigException
-import rasa.shared.utils.io
-import rasa.utils.io
+from rasa.shared.nlu.constants import TEXT
+from rasa.shared.nlu.training_data.message import Message
+from rasa.shared.nlu.training_data.training_data import TrainingData
 
 logger = logging.getLogger(__name__)
-
 
 END_OF_SENTENCE = "EOS"
 BEGIN_OF_SENTENCE = "BOS"
 
 FEATURES = "features"
+
+SEPERATOR = "###"
 
 
 @DefaultV1Recipe.register(
@@ -72,7 +74,7 @@ class LexicalSyntacticFeaturizer(SparseFeaturizer, GraphComponent):
       of the token at position `t+1`.
     """
 
-    FILENAME_FEATURE_TO_IDX_DICT = "feature_to_idx_dict.pkl"
+    FILENAME_FEATURE_TO_IDX_DICT = "feature_to_idx_dict.json"
 
     # NOTE: "suffix5" of the token "is" will be "is". Hence, when combining multiple
     # prefixes, short words will be represented/encoded repeatedly.
@@ -489,6 +491,32 @@ class LexicalSyntacticFeaturizer(SparseFeaturizer, GraphComponent):
         """Creates a new untrained component (see parent class for full docstring)."""
         return cls(config, model_storage, resource, execution_context)
 
+    @staticmethod
+    def _restructure_feature_to_idx_dict(
+        loaded_data: Dict[str, Dict[str, int]],
+    ) -> Dict[Tuple[int, str], Dict[str, int]]:
+        """Reconstructs the feature to idx dict.
+
+        When storing the feature_to_idx_dict to disk, we need to convert the tuple (key)
+        into a string to be able to store it via json. When loading the data
+        we need to reconstruct the tuple from the stored string.
+
+        Args:
+            loaded_data: The loaded feature to idx dict from file.
+
+        Returns:
+            The reconstructed feature_to_idx_dict
+        """
+        feature_to_idx_dict = {}
+        for tuple_string, feature_value in loaded_data.items():
+            # Example of tuple_string: "1###low"
+            index, feature_name = tuple_string.split(SEPERATOR)
+
+            feature_key = (int(index), feature_name)
+            feature_to_idx_dict[feature_key] = feature_value
+
+        return feature_to_idx_dict
+
     @classmethod
     def load(
         cls,
@@ -501,10 +529,13 @@ class LexicalSyntacticFeaturizer(SparseFeaturizer, GraphComponent):
         """Loads trained component (see parent class for full docstring)."""
         try:
             with model_storage.read_from(resource) as model_path:
-                feature_to_idx_dict = rasa.utils.io.json_unpickle(
+                loaded_data = rasa.shared.utils.io.read_json_file(
                     model_path / cls.FILENAME_FEATURE_TO_IDX_DICT,
-                    encode_non_string_keys=True,
                 )
+
+                # convert the key back into tuple
+                feature_to_idx_dict = cls._restructure_feature_to_idx_dict(loaded_data)
+
                 return cls(
                     config=config,
                     model_storage=model_storage,
@@ -529,9 +560,13 @@ class LexicalSyntacticFeaturizer(SparseFeaturizer, GraphComponent):
         if not self._feature_to_idx_dict:
             return None
 
+        # as we cannot dump tuples, convert the tuple into a string
+        restructured_feature_dict = {
+            f"{k[0]}{SEPERATOR}{k[1]}": v for k, v in self._feature_to_idx_dict.items()
+        }
+
         with self._model_storage.write_to(self._resource) as model_path:
-            rasa.utils.io.json_pickle(
+            rasa.shared.utils.io.dump_obj_as_json_to_file(
                 model_path / self.FILENAME_FEATURE_TO_IDX_DICT,
-                self._feature_to_idx_dict,
-                encode_non_string_keys=True,
+                restructured_feature_dict,
             )

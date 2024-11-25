@@ -1,18 +1,17 @@
 from __future__ import annotations
+
 import copy
 import logging
 from collections import defaultdict
 from pathlib import Path
-
-from rasa.exceptions import ModelNotFound
-from rasa.nlu.featurizers.featurizer import Featurizer
+from typing import Any, Dict, List, Optional, Text, Tuple, Union, TypeVar, Type
 
 import numpy as np
 import scipy.sparse
 import tensorflow as tf
 
-from typing import Any, Dict, List, Optional, Text, Tuple, Union, TypeVar, Type
-
+from rasa.exceptions import ModelNotFound
+from rasa.nlu.featurizers.featurizer import Featurizer
 from rasa.engine.graph import ExecutionContext, GraphComponent
 from rasa.engine.recipes.default_recipe import DefaultV1Recipe
 from rasa.engine.storage.resource import Resource
@@ -20,18 +19,21 @@ from rasa.engine.storage.storage import ModelStorage
 from rasa.nlu.extractors.extractor import EntityExtractorMixin
 from rasa.nlu.classifiers.classifier import IntentClassifier
 import rasa.shared.utils.io
-import rasa.utils.io as io_utils
 import rasa.nlu.utils.bilou_utils as bilou_utils
 from rasa.shared.constants import DIAGNOSTIC_DATA
 from rasa.nlu.extractors.extractor import EntityTagSpec
 from rasa.nlu.classifiers import LABEL_RANKING_LENGTH
 from rasa.utils import train_utils
 from rasa.utils.tensorflow import rasa_layers
+from rasa.utils.tensorflow.feature_array import (
+    FeatureArray,
+    serialize_nested_feature_arrays,
+    deserialize_nested_feature_arrays,
+)
 from rasa.utils.tensorflow.models import RasaModel, TransformerRasaModel
 from rasa.utils.tensorflow.model_data import (
     RasaModelData,
     FeatureSignature,
-    FeatureArray,
 )
 from rasa.nlu.constants import TOKENS_NAMES, DEFAULT_TRANSFORMER_SIZE
 from rasa.shared.nlu.constants import (
@@ -116,7 +118,6 @@ LABEL_KEY = LABEL
 LABEL_SUB_KEY = IDS
 
 POSSIBLE_TAGS = [ENTITY_ATTRIBUTE_TYPE, ENTITY_ATTRIBUTE_ROLE, ENTITY_ATTRIBUTE_GROUP]
-
 
 DIETClassifierT = TypeVar("DIETClassifierT", bound="DIETClassifier")
 
@@ -1080,18 +1081,24 @@ class DIETClassifier(GraphComponent, IntentClassifier, EntityExtractorMixin):
 
             self.model.save(str(tf_model_file))
 
-            io_utils.pickle_dump(
-                model_path / f"{file_name}.data_example.pkl", self._data_example
+            # save data example
+            serialize_nested_feature_arrays(
+                self._data_example,
+                model_path / f"{file_name}.data_example.st",
+                model_path / f"{file_name}.data_example_metadata.json",
             )
-            io_utils.pickle_dump(
-                model_path / f"{file_name}.sparse_feature_sizes.pkl",
+            # save label data
+            serialize_nested_feature_arrays(
+                dict(self._label_data.data) if self._label_data is not None else {},
+                model_path / f"{file_name}.label_data.st",
+                model_path / f"{file_name}.label_data_metadata.json",
+            )
+
+            rasa.shared.utils.io.dump_obj_as_json_to_file(
+                model_path / f"{file_name}.sparse_feature_sizes.json",
                 self._sparse_feature_sizes,
             )
-            io_utils.pickle_dump(
-                model_path / f"{file_name}.label_data.pkl",
-                dict(self._label_data.data) if self._label_data is not None else {},
-            )
-            io_utils.json_pickle(
+            rasa.shared.utils.io.dump_obj_as_json_to_file(
                 model_path / f"{file_name}.index_label_id_mapping.json",
                 self.index_label_id_mapping,
             )
@@ -1180,15 +1187,22 @@ class DIETClassifier(GraphComponent, IntentClassifier, EntityExtractorMixin):
     ]:
         file_name = cls.__name__
 
-        data_example = io_utils.pickle_load(
-            model_path / f"{file_name}.data_example.pkl"
+        # load data example
+        data_example = deserialize_nested_feature_arrays(
+            str(model_path / f"{file_name}.data_example.st"),
+            str(model_path / f"{file_name}.data_example_metadata.json"),
         )
-        label_data = io_utils.pickle_load(model_path / f"{file_name}.label_data.pkl")
-        label_data = RasaModelData(data=label_data)
-        sparse_feature_sizes = io_utils.pickle_load(
-            model_path / f"{file_name}.sparse_feature_sizes.pkl"
+        # load label data
+        loaded_label_data = deserialize_nested_feature_arrays(
+            str(model_path / f"{file_name}.label_data.st"),
+            str(model_path / f"{file_name}.label_data_metadata.json"),
         )
-        index_label_id_mapping = io_utils.json_unpickle(
+        label_data = RasaModelData(data=loaded_label_data)
+
+        sparse_feature_sizes = rasa.shared.utils.io.read_json_file(
+            model_path / f"{file_name}.sparse_feature_sizes.json"
+        )
+        index_label_id_mapping = rasa.shared.utils.io.read_json_file(
             model_path / f"{file_name}.index_label_id_mapping.json"
         )
         entity_tag_specs = rasa.shared.utils.io.read_json_file(
@@ -1208,7 +1222,6 @@ class DIETClassifier(GraphComponent, IntentClassifier, EntityExtractorMixin):
             for tag_spec in entity_tag_specs
         ]
 
-        # jsonpickle converts dictionary keys to strings
         index_label_id_mapping = {
             int(key): value for key, value in index_label_id_mapping.items()
         }

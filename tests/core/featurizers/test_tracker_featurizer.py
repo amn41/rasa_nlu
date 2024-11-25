@@ -34,7 +34,25 @@ def test_fail_to_load_non_existent_featurizer():
     assert TrackerFeaturizer.load("non_existent_class") is None
 
 
-def test_persist_and_load_tracker_featurizer(tmp_path: Text, moodbot_domain: Domain):
+def test_persist_and_load_full_dialogue_tracker_featurizer(
+    tmp_path: Text, moodbot_domain: Domain
+):
+    state_featurizer = SingleStateFeaturizer()
+    state_featurizer.prepare_for_training(moodbot_domain)
+    tracker_featurizer = FullDialogueTrackerFeaturizer(state_featurizer)
+
+    tracker_featurizer.persist(tmp_path)
+
+    loaded_tracker_featurizer = TrackerFeaturizer.load(tmp_path)
+
+    assert loaded_tracker_featurizer is not None
+    assert loaded_tracker_featurizer.state_featurizer is not None
+    assert loaded_tracker_featurizer.to_dict() == tracker_featurizer.to_dict()
+
+
+def test_persist_and_load_max_history_tracker_featurizer(
+    tmp_path: Text, moodbot_domain: Domain
+):
     state_featurizer = SingleStateFeaturizer()
     state_featurizer.prepare_for_training(moodbot_domain)
     tracker_featurizer = MaxHistoryTrackerFeaturizer(state_featurizer)
@@ -45,6 +63,23 @@ def test_persist_and_load_tracker_featurizer(tmp_path: Text, moodbot_domain: Dom
 
     assert loaded_tracker_featurizer is not None
     assert loaded_tracker_featurizer.state_featurizer is not None
+    assert loaded_tracker_featurizer.to_dict() == tracker_featurizer.to_dict()
+
+
+def test_persist_and_load_intent_max_history_tracker_featurizer(
+    tmp_path: Text, moodbot_domain: Domain
+):
+    state_featurizer = SingleStateFeaturizer()
+    state_featurizer.prepare_for_training(moodbot_domain)
+    tracker_featurizer = IntentMaxHistoryTrackerFeaturizer(state_featurizer)
+
+    tracker_featurizer.persist(tmp_path)
+
+    loaded_tracker_featurizer = TrackerFeaturizer.load(tmp_path)
+
+    assert loaded_tracker_featurizer is not None
+    assert loaded_tracker_featurizer.state_featurizer is not None
+    assert loaded_tracker_featurizer.to_dict() == tracker_featurizer.to_dict()
 
 
 def test_convert_action_labels_to_ids(domain: Domain):
@@ -127,7 +162,6 @@ def compare_featurized_states(
     """Compares two lists of featurized states and returns True if they
     are identical and False otherwise.
     """
-
     if len(states1) != len(states2):
         return False
 

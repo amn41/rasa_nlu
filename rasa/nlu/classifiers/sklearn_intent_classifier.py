@@ -1,6 +1,6 @@
 from __future__ import annotations
+
 import logging
-from rasa.nlu.featurizers.dense_featurizer.dense_featurizer import DenseFeaturizer
 import typing
 import warnings
 from typing import Any, Dict, List, Optional, Text, Tuple, Type
@@ -8,18 +8,18 @@ from typing import Any, Dict, List, Optional, Text, Tuple, Type
 import numpy as np
 
 import rasa.shared.utils.io
-import rasa.utils.io as io_utils
 from rasa.engine.graph import GraphComponent, ExecutionContext
 from rasa.engine.recipes.default_recipe import DefaultV1Recipe
 from rasa.engine.storage.resource import Resource
 from rasa.engine.storage.storage import ModelStorage
-from rasa.shared.constants import DOCS_URL_TRAINING_DATA_NLU
 from rasa.nlu.classifiers import LABEL_RANKING_LENGTH
+from rasa.nlu.classifiers.classifier import IntentClassifier
+from rasa.nlu.featurizers.dense_featurizer.dense_featurizer import DenseFeaturizer
+from rasa.shared.constants import DOCS_URL_TRAINING_DATA_NLU
 from rasa.shared.exceptions import RasaException
 from rasa.shared.nlu.constants import TEXT
-from rasa.nlu.classifiers.classifier import IntentClassifier
-from rasa.shared.nlu.training_data.training_data import TrainingData
 from rasa.shared.nlu.training_data.message import Message
+from rasa.shared.nlu.training_data.training_data import TrainingData
 from rasa.utils.tensorflow.constants import FEATURIZERS
 
 logger = logging.getLogger(__name__)
@@ -266,14 +266,20 @@ class SklearnIntentClassifier(GraphComponent, IntentClassifier):
 
     def persist(self) -> None:
         """Persist this model into the passed directory."""
+        import skops.io as sio
+
         with self._model_storage.write_to(self._resource) as model_dir:
             file_name = self.__class__.__name__
-            classifier_file_name = model_dir / f"{file_name}_classifier.pkl"
-            encoder_file_name = model_dir / f"{file_name}_encoder.pkl"
+            classifier_file_name = model_dir / f"{file_name}_classifier.skops"
+            encoder_file_name = model_dir / f"{file_name}_encoder.json"
 
             if self.clf and self.le:
-                io_utils.json_pickle(encoder_file_name, self.le.classes_)
-                io_utils.json_pickle(classifier_file_name, self.clf.best_estimator_)
+                # convert self.le.classes_ (numpy array of strings) to a list in order
+                # to use json dump
+                rasa.shared.utils.io.dump_obj_as_json_to_file(
+                    encoder_file_name, list(self.le.classes_)
+                )
+                sio.dump(self.clf.best_estimator_, classifier_file_name)
 
     @classmethod
     def load(
@@ -286,21 +292,36 @@ class SklearnIntentClassifier(GraphComponent, IntentClassifier):
     ) -> SklearnIntentClassifier:
         """Loads trained component (see parent class for full docstring)."""
         from sklearn.preprocessing import LabelEncoder
+        import skops.io as sio
 
         try:
             with model_storage.read_from(resource) as model_dir:
                 file_name = cls.__name__
-                classifier_file = model_dir / f"{file_name}_classifier.pkl"
+                classifier_file = model_dir / f"{file_name}_classifier.skops"
 
                 if classifier_file.exists():
-                    classifier = io_utils.json_unpickle(classifier_file)
+                    unknown_types = sio.get_untrusted_types(file=classifier_file)
 
-                    encoder_file = model_dir / f"{file_name}_encoder.pkl"
-                    classes = io_utils.json_unpickle(encoder_file)
+                    if unknown_types:
+                        logger.error(
+                            f"Untrusted types ({unknown_types}) found when "
+                            f"loading {classifier_file}!"
+                        )
+                        raise ValueError()
+                    else:
+                        classifier = sio.load(classifier_file, trusted=unknown_types)
+
+                    encoder_file = model_dir / f"{file_name}_encoder.json"
+                    classes = rasa.shared.utils.io.read_json_file(encoder_file)
+
                     encoder = LabelEncoder()
-                    encoder.classes_ = classes
-
-                    return cls(config, model_storage, resource, classifier, encoder)
+                    intent_classifier = cls(
+                        config, model_storage, resource, classifier, encoder
+                    )
+                    # convert list of strings (class labels) back to numpy array of
+                    # strings
+                    intent_classifier.transform_labels_str2num(classes)
+                    return intent_classifier
         except ValueError:
             logger.debug(
                 f"Failed to load '{cls.__name__}' from model storage. Resource "
