@@ -132,14 +132,12 @@ jobs:
 
       - name: Install poetry 🦄
         if: needs.changes.outputs.backend == 'true'
-        uses: Gr1N/setup-poetry@15821dc8a61bc630db542ae4baf6a7c19a994844 # v8
+        uses: snok/install-poetry@93ada01c735cc8a383ce0ce2ae205a21c415379b
         with:
-          poetry-version: ${{ env.POETRY_VERSION }}
-
-      - name: Inject setuptools into poetry's runtime environment
-        if: needs.changes.outputs.backend == 'true'
-        run: |
-          poetry self add setuptools
+          version: ${{ env.POETRY_VERSION }}
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+          installer-parallel: true
 
       - name: Load Poetry Cached Libraries ⬇
         id: cache-poetry
@@ -278,14 +276,12 @@ jobs:
 
       - name: Install poetry 🦄
         if: needs.changes.outputs.backend == 'true'
-        uses: Gr1N/setup-poetry@15821dc8a61bc630db542ae4baf6a7c19a994844 # v8
+        uses: snok/install-poetry@93ada01c735cc8a383ce0ce2ae205a21c415379b
         with:
-          poetry-version: ${{ env.POETRY_VERSION }}
-
-      - name: Inject setuptools into poetry's runtime environment
-        if: needs.changes.outputs.backend == 'true'
-        run: |
-          poetry self add setuptools
+          version: ${{ env.POETRY_VERSION }}
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+          installer-parallel: true
 
       - name: Prevent race condition in poetry build
         # More context about race condition during poetry build can be found here:
@@ -440,14 +436,12 @@ jobs:
 
       - name: Install poetry 🦄
         if: needs.changes.outputs.backend == 'true'
-        uses: Gr1N/setup-poetry@15821dc8a61bc630db542ae4baf6a7c19a994844 # v8
+        uses: snok/install-poetry@93ada01c735cc8a383ce0ce2ae205a21c415379b
         with:
-          poetry-version: ${{ env.POETRY_VERSION }}
-
-      - name: Inject setuptools into poetry's runtime environment
-        if: needs.changes.outputs.backend == 'true'
-        run: |
-          poetry self add setuptools
+          version: ${{ env.POETRY_VERSION }}
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+          installer-parallel: true
 
       - name: Load Poetry Cached Libraries ⬇
         id: cache-poetry
@@ -678,9 +672,12 @@ jobs:
 
       - name: Install poetry 🦄
         if: needs.changes.outputs.backend == 'true'
-        uses: Gr1N/setup-poetry@15821dc8a61bc630db542ae4baf6a7c19a994844 # v8
+        uses: snok/install-poetry@93ada01c735cc8a383ce0ce2ae205a21c415379b
         with:
-          poetry-version: ${{ env.POETRY_VERSION }}
+          version: ${{ env.POETRY_VERSION }}
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+          installer-parallel: true
 
       - name: Load Poetry Cached Libraries ⬇
         id: cache-poetry
@@ -765,9 +762,12 @@ jobs:
 
       - name: Install poetry 🦄
         if: needs.changes.outputs.backend == 'true'
-        uses: Gr1N/setup-poetry@15821dc8a61bc630db542ae4baf6a7c19a994844 # v8
+        uses: snok/install-poetry@93ada01c735cc8a383ce0ce2ae205a21c415379b
         with:
-          poetry-version: ${{ env.POETRY_VERSION }}
+          version: ${{ env.POETRY_VERSION }}
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+          installer-parallel: true
 
       - name: Load Poetry Cached Libraries ⬇
         id: cache-poetry
@@ -873,9 +873,12 @@ jobs:
 
       - name: Install poetry 🦄
         if: needs.changes.outputs.backend == 'true'
-        uses: Gr1N/setup-poetry@15821dc8a61bc630db542ae4baf6a7c19a994844 # v8
+        uses: snok/install-poetry@93ada01c735cc8a383ce0ce2ae205a21c415379b
         with:
-          poetry-version: ${{ env.POETRY_VERSION }}
+          version: ${{ env.POETRY_VERSION }}
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+          installer-parallel: true
 
       - name: Load Poetry Cached Libraries ⬇
         id: cache-poetry
@@ -1232,9 +1235,13 @@ jobs:
         shell: bash
 
       - name: Install poetry 🦄
-        uses: Gr1N/setup-poetry@15821dc8a61bc630db542ae4baf6a7c19a994844 # v8
+        if: needs.changes.outputs.backend == 'true'
+        uses: snok/install-poetry@93ada01c735cc8a383ce0ce2ae205a21c415379b
         with:
-          poetry-version: ${{ env.POETRY_VERSION }}
+          version: ${{ env.POETRY_VERSION }}
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+          installer-parallel: true
 
       - name: Copy Segment write key to the package
         env:
