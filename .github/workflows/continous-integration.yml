@@ -394,9 +394,9 @@ jobs:
         if: needs.changes.outputs.backend == 'true' && matrix.os == 'ubuntu-22.04'
         uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 #v4.4.3
         with:
-          name: ${{ matrix.test }}-coverage
+          name: ${{ matrix.test }}-${{ matrix.python-version }}-${{ matrix.os }}-coverage
           path: |
-            ${{ github.workspace }}/${{ matrix.test }}-coverage
+            ${{ github.workspace }}/${{ matrix.test }}-${{ matrix.python-version }}-${{ matrix.os }}-coverage
 
   test-flaky:
     name: Run Flaky Tests
@@ -543,9 +543,9 @@ jobs:
         if: needs.changes.outputs.backend == 'true' && matrix.os == 'ubuntu-22.04'
         uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 #v4.4.3
         with:
-          name: ${{ matrix.test }}-coverage
+          name: ${{ matrix.test }}-${{ matrix.python-version }}-${{ matrix.os }}-coverage
           path: |
-            ${{ github.workspace }}/${{ matrix.test }}-coverage
+            ${{ github.workspace }}/${{ matrix.test }}-${{ matrix.python-version }}-${{ matrix.os }}-coverage
 
   upload_coverage_reports:
     name: Upload coverage reports to codeclimate
