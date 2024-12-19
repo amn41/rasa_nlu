@@ -7,7 +7,7 @@ jobs:
   # thats's all. single step is needed - if PR is mergeable according to
   # branch protection rules it will be merged automatically
   mergepal:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     if: github.repository == 'RasaHQ/rasa'
 
     steps:

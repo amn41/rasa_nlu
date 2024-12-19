@@ -14,7 +14,7 @@ jobs:
     # User-definable name of this GitHub Actions job:
     name: Semgrep Workflow Security Scan
     # If you are self-hosting, change the following `runs-on` value:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
 
     container:
       # A Docker image with Semgrep installed. Do not change this.
