@@ -17,7 +17,7 @@ env:
 jobs:
   read_test_configuration:
     name: Reads tests configuration
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
       matrix_length: ${{ steps.set-matrix.outputs.matrix_length }}
@@ -53,7 +53,7 @@ jobs:
   deploy_runner_gpu:
     name: Deploy Github Runner - GPU
     needs: read_test_configuration
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout
@@ -503,7 +503,7 @@ jobs:
 
   combine_reports:
     name: Combine reports
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs:
       - model_regression_test_gpu
     if: always() && needs.model_regression_test_gpu.result == 'success'
@@ -542,7 +542,7 @@ jobs:
 
   analyse_performance:
     name: Analyse Performance
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     if: always() && github.event_name == 'schedule'
     needs:
       - model_regression_test_gpu
@@ -691,7 +691,7 @@ jobs:
     needs:
       - deploy_runner_gpu
       - model_regression_test_gpu
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
 
     steps:
 

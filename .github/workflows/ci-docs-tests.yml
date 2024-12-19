@@ -16,7 +16,7 @@ env:
 jobs:
   changes:
     name: Check for file changes
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     outputs:
       docs: ${{ steps.filter.outputs.docs }}
     steps:
@@ -29,7 +29,7 @@ jobs:
 
   test_documentation:
     name: Test Documentation
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: [changes]
     if: needs.changes.outputs.docs == 'true'
 
@@ -100,7 +100,7 @@ jobs:
 
   documentation_lint:
     name: Documentation Linting Checks
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: [changes]
     if: needs.changes.outputs.docs == 'true'
 
