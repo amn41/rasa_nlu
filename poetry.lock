@@ -1412,7 +1412,7 @@ requests = ">=2.0"
 name = "filelock"
 version = "3.12.2"
 description = "A platform independent file lock."
-optional = true
+optional = false
 python-versions = ">=3.7"
 files = [
     {file = "filelock-3.12.2-py3-none-any.whl", hash = "sha256:cbb791cdea2a72f23da6ac5b5269ab0a0d161e9ef0100e653b69049a7706d1ec"},
@@ -2216,8 +2216,8 @@ socks = ["socksio (==1.*)"]
 name = "huggingface-hub"
 version = "0.27.0"
 description = "Client library to download and publish models, datasets and other repos on the huggingface.co hub"
-optional = true
-python-versions = ">=3.7.0"
+optional = false
+python-versions = ">=3.8.0"
 files = [
     {file = "huggingface_hub-0.27.0-py3-none-any.whl", hash = "sha256:8f2e834517f1f1ddf1ecc716f91b120d7333011b7485f665a9a412eacb1a2a81"},
     {file = "huggingface_hub-0.27.0.tar.gz", hash = "sha256:902cce1a1be5739f5589e560198a65a8edcfd3b830b1666f36e4b961f0454fac"},
@@ -2416,10 +2416,32 @@ files = [
     {file = "jmespath-1.0.1.tar.gz", hash = "sha256:90261b206d6defd58fdd5e85f478bf633a2901798906be2ad389150c5c60edbe"},
 ]
 
+[[package]]
+name = "joblib"
+version = "1.4.2"
+description = "Lightweight pipelining with Python functions"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "joblib-1.4.2-py3-none-any.whl", hash = "sha256:06d478d5674cbc267e7496a410ee875abd68e4340feff4490bcb7afb88060ae6"},
+    {file = "joblib-1.4.2.tar.gz", hash = "sha256:2382c5816b2636fbd20a09e0f4e9dad4736765fdfb7dca582943b9c1366b3f0e"},
+]
+
+[[package]]
+name = "jsonpickle"
+version = "3.0.4"
+description = "Serialize any Python object to JSON"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "jsonpickle-3.0.4-py3-none-any.whl", hash = "sha256:04ae7567a14269579e3af66b76bda284587458d7e8a204951ca8f71a3309952e"},
+    {file = "jsonpickle-3.0.4.tar.gz", hash = "sha256:a1b14c8d6221cd8f394f2a97e735ea1d7edc927fbd135b26f2f8700657c8c62b"},
+]
+
 [package.extras]
-docs = ["jaraco.packaging (>=3.2)", "rst.linker (>=1.9)", "sphinx"]
-testing = ["ecdsa", "feedparser", "gmpy2", "numpy", "pandas", "pymongo", "pytest (>=3.5,!=3.7.3)", "pytest-black-multipy", "pytest-checkdocs (>=1.2.3)", "pytest-cov", "pytest-flake8 (>=1.1.1)", "scikit-learn", "sqlalchemy"]
-testing-libs = ["simplejson", "ujson"]
+docs = ["furo", "rst.linker (>=1.9)", "sphinx"]
+packaging = ["build", "twine"]
+testing = ["bson", "ecdsa", "feedparser", "gmpy2", "numpy", "pandas", "pymongo", "pytest (>=3.5,!=3.7.3)", "pytest-benchmark", "pytest-benchmark[histogram]", "pytest-checkdocs (>=1.2.3)", "pytest-cov", "pytest-enabler (>=1.0.1)", "pytest-ruff (>=0.2.1)", "scikit-learn", "scipy", "scipy (>=1.9.3)", "simplejson", "sqlalchemy", "ujson"]
 
 [[package]]
 name = "jsonschema"
@@ -4730,7 +4752,6 @@ crt = ["botocore[crt] (>=1.20.29,<2.0a.0)"]
 name = "safetensors"
 version = "0.4.5"
 description = ""
-category = "main"
 optional = false
 python-versions = ">=3.7"
 files = [
@@ -5173,7 +5194,6 @@ tqdm = ">=2.0"
 name = "skops"
 version = "0.9.0"
 description = "A set of tools to push scikit-learn based models to and pull from Hugging Face Hub"
-category = "main"
 optional = false
 python-versions = ">=3.8"
 files = [
@@ -6100,7 +6120,7 @@ files = [
 [[package]]
 name = "tokenizers"
 version = "0.15.2"
-description = "Fast and Customizable Tokenizers"
+description = ""
 optional = true
 python-versions = ">=3.7"
 files = [
@@ -7167,4 +7187,4 @@ transformers = ["sentencepiece", "transformers"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.8,<3.11"
-content-hash = "ea1217b11ce97a3bdfa6a9eecc711ab9b69b9313cba1ce896ce5b5bc58bde18f"
+content-hash = "200b2c43e9c578b18298ddd0e21dda002bd93fb262d04268ae38f4af5962cba9"
