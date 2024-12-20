@@ -153,7 +153,7 @@ dnspython = "2.3.0"
 wheel = ">=0.38.1"
 certifi = ">=2023.7.22"
 cryptography = ">=41.0.2"
-skops = "~0.10.0"
+skops = "0.9.0"
 safetensors = "~0.4.5"
 
 [[tool.poetry.dependencies.tensorflow-io-gcs-filesystem]]
@@ -285,7 +285,7 @@ version = "~3.2.0"
 optional = true
 
 [tool.poetry.dependencies.transformers]
-version = ">=4.13.0, <=4.26.0"
+version = "~4.36.2"
 optional = true
 
 [tool.poetry.dependencies.sentencepiece]
