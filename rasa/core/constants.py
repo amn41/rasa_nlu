@@ -24,6 +24,8 @@ DEFAULT_STREAM_READING_TIMEOUT = 10  # in seconds
 
 DEFAULT_LOCK_LIFETIME = 60  # in seconds
 
+DEFAULT_KEEP_ALIVE_TIMEOUT = 120  # in seconds
+
 BEARER_TOKEN_PREFIX = "Bearer "
 
 # The lowest priority is intended to be used by machine learning policies.

@@ -260,9 +260,11 @@ class KafkaEventBroker(EventBroker):
                 on_delivery=delivery_report,
             )
 
-    def _close(self) -> None:
+    async def close(self) -> None:
         self._cancelled = True
         self._poll_thread.join()
+        if self.producer:
+            self.producer.flush()
 
     @rasa.shared.utils.common.lazy_property
     def rasa_environment(self) -> Optional[Text]:

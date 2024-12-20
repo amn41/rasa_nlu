@@ -1,9 +1,12 @@
+import pytest
+
 from rasa.core.brokers.kafka import KafkaEventBroker
 from pytest import LogCaptureFixture
 import logging.config
 
 
-def test_kafka_event_broker_valid():
+@pytest.mark.broker
+async def test_kafka_event_broker_valid():
     broker = KafkaEventBroker(
         url="localhost",
         topic="rasa",
@@ -19,11 +22,11 @@ def test_kafka_event_broker_valid():
         )
         assert broker.producer.poll() == 1
     finally:
-        broker.producer.flush()
-        broker._close()
+        await broker.close()
 
 
-def test_kafka_event_broker_buffer_error_is_handled(caplog: LogCaptureFixture):
+@pytest.mark.broker
+async def test_kafka_event_broker_buffer_error_is_handled(caplog: LogCaptureFixture):
     broker = KafkaEventBroker(
         url="localhost",
         topic="rasa",
@@ -48,5 +51,4 @@ def test_kafka_event_broker_buffer_error_is_handled(caplog: LogCaptureFixture):
         assert "Queue full" in caplog.text
         assert broker.producer.poll() == 1
     finally:
-        broker.producer.flush()
-        broker._close()
+        await broker.close()

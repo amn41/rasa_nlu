@@ -302,6 +302,7 @@ def create_data_generators(
     eval_num_examples: int = 0,
     random_seed: Optional[int] = None,
     shuffle: bool = True,
+    drop_small_last_batch: bool = False,
 ) -> Tuple[RasaBatchDataGenerator, Optional[RasaBatchDataGenerator]]:
     """Create data generators for train and optional validation data.
 
@@ -313,6 +314,8 @@ def create_data_generators(
         eval_num_examples: Number of examples to use for validation data.
         random_seed: The random seed.
         shuffle: Whether to shuffle data inside the data generator.
+        drop_small_last_batch: whether to drop the last batch if it has fewer than half
+                               a batch size of examples
 
     Returns:
         The training data generator and optional validation data generator.
@@ -328,6 +331,7 @@ def create_data_generators(
             epochs=epochs,
             batch_strategy=batch_strategy,
             shuffle=shuffle,
+            drop_small_last_batch=drop_small_last_batch,
         )
 
     data_generator = RasaBatchDataGenerator(
@@ -336,6 +340,7 @@ def create_data_generators(
         epochs=epochs,
         batch_strategy=batch_strategy,
         shuffle=shuffle,
+        drop_small_last_batch=drop_small_last_batch,
     )
 
     return data_generator, validation_data_generator

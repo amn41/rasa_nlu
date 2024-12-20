@@ -73,9 +73,9 @@ async def test_fetch_events_within_time_range():
     conversation_ids = ["some-id", "another-id"]
 
     # prepare events from different senders and different timestamps
-    event_1 = random_user_uttered_event(3)
-    event_2 = random_user_uttered_event(2)
-    event_3 = random_user_uttered_event(1)
+    event_1 = random_user_uttered_event(1)
+    event_2 = random_user_uttered_event(3)
+    event_3 = random_user_uttered_event(2)
     events = {conversation_ids[0]: [event_1, event_2], conversation_ids[1]: [event_3]}
 
     def _get_tracker(conversation_id: Text) -> DialogueStateTracker:

@@ -129,24 +129,3 @@ jobs:
       - name: Run Bandit 🔪
         if: needs.changes.outputs.backend == 'true'
         run: make lint-security
-
-  snyk:
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c
-      - name: Run Snyk Open Source to check for Python vulnerabilities
-        uses: snyk/actions/python-3.8@master
-        continue-on-error: true
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          command: monitor
-          args: --all-projects --org=rasa --skip-unresolved
-      - name: Run Snyk Open Source to check for JS vulnerabilities
-        uses: snyk/actions/node@master
-        continue-on-error: true
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          command: monitor
-          args: --org=rasa --yarn-workspaces --strict-out-of-sync=false --prune-repeated-subdependencies

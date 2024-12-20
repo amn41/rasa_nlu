@@ -1,8 +1,6 @@
 import ssl
-from functools import cached_property
 
 import aiohttp
-import logging
 import os
 from aiohttp.client_exceptions import ContentTypeError
 from sanic.request import Request
@@ -11,10 +9,11 @@ from typing import Any, Optional, Text, Dict
 from rasa.shared.exceptions import FileNotFoundException
 import rasa.shared.utils.io
 import rasa.utils.io
+import structlog
 from rasa.core.constants import DEFAULT_REQUEST_TIMEOUT
 
 
-logger = logging.getLogger(__name__)
+structlogger = structlog.get_logger()
 
 
 def read_endpoint_config(
@@ -32,9 +31,13 @@ def read_endpoint_config(
 
         return EndpointConfig.from_dict(content[endpoint_type])
     except FileNotFoundError:
-        logger.error(
-            "Failed to read endpoint configuration "
-            "from {}. No such file.".format(os.path.abspath(filename))
+        structlogger.error(
+            "endpoint.read.failed_no_such_file",
+            filename=os.path.abspath(filename),
+            event_info=(
+                "Failed to read endpoint configuration file - "
+                "the file was not found."
+            ),
         )
         return None
 
@@ -56,9 +59,13 @@ def concat_url(base: Text, subpath: Optional[Text]) -> Text:
     """
     if not subpath:
         if base.endswith("/"):
-            logger.debug(
-                f"The URL '{base}' has a trailing slash. Please make sure the "
-                f"target server supports trailing slashes for this endpoint."
+            structlogger.debug(
+                "endpoint.concat_url.trailing_slash",
+                url=base,
+                event_info=(
+                    "The URL has a trailing slash. Please make sure the "
+                    "target server supports trailing slashes for this endpoint."
+                ),
             )
         return base
 
@@ -95,7 +102,6 @@ class EndpointConfig:
         self.cafile = cafile
         self.kwargs = kwargs
 
-    @cached_property
     def session(self) -> aiohttp.ClientSession:
         """Creates and returns a configured aiohttp client session."""
         # create authentication parameters
@@ -164,23 +170,26 @@ class EndpointConfig:
                     f"'{os.path.abspath(self.cafile)}' does not exist."
                 ) from e
 
-        async with self.session.request(
-            method,
-            url,
-            headers=headers,
-            params=self.combine_parameters(kwargs),
-            compress=compress,
-            ssl=sslcontext,
-            **kwargs,
-        ) as response:
-            if response.status >= 400:
-                raise ClientResponseError(
-                    response.status, response.reason, await response.content.read()
-                )
-            try:
-                return await response.json()
-            except ContentTypeError:
-                return None
+        async with self.session() as session:
+            async with session.request(
+                method,
+                url,
+                headers=headers,
+                params=self.combine_parameters(kwargs),
+                compress=compress,
+                ssl=sslcontext,
+                **kwargs,
+            ) as response:
+                if response.status >= 400:
+                    raise ClientResponseError(
+                        response.status,
+                        response.reason,
+                        await response.content.read(),
+                    )
+                try:
+                    return await response.json()
+                except ContentTypeError:
+                    return None
 
     @classmethod
     def from_dict(cls, data: Dict[Text, Any]) -> "EndpointConfig":
@@ -263,7 +272,7 @@ def float_arg(
     try:
         return float(str(arg))
     except (ValueError, TypeError):
-        logger.warning(f"Failed to convert '{arg}' to float.")
+        structlogger.warning("endpoint.float_arg.convert_failed", arg=arg, key=key)
         return default
 
 
@@ -291,5 +300,6 @@ def int_arg(
     try:
         return int(str(arg))
     except (ValueError, TypeError):
-        logger.warning(f"Failed to convert '{arg}' to int.")
+
+        structlogger.warning("endpoint.int_arg.convert_failed", arg=arg, key=key)
         return default

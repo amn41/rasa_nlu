@@ -1,4 +1,4 @@
-import logging
+import structlog
 from pathlib import Path
 from typing import Text, Optional, Union
 from unittest.mock import Mock
@@ -35,13 +35,14 @@ def test_concat_url(base, subpath, expected_result):
     assert endpoint_utils.concat_url(base, subpath) == expected_result
 
 
-def test_warning_for_base_paths_with_trailing_slash(caplog):
+def test_warning_for_base_paths_with_trailing_slash():
     test_path = "base/"
-
-    with caplog.at_level(logging.DEBUG, logger="rasa.utils.endpoints"):
+    with structlog.testing.capture_logs() as caplog:
         assert endpoint_utils.concat_url(test_path, None) == test_path
 
-    assert len(caplog.records) == 1
+    assert len(caplog) == 1
+    assert caplog[0]["event"] == "endpoint.concat_url.trailing_slash"
+    assert caplog[0]["log_level"] == "debug"
 
 
 async def test_endpoint_config():
@@ -88,7 +89,7 @@ async def test_endpoint_config():
 
         # unfortunately, the mock library won't report any headers stored on
         # the session object, so we need to verify them separately
-        async with endpoint.session as s:
+        async with endpoint.session() as s:
             assert s._default_headers.get("X-Powered-By") == "Rasa"
             assert s._default_auth.login == "user"
             assert s._default_auth.password == "pass"
@@ -231,32 +232,3 @@ def test_int_arg(value: Optional[Union[int, str]], default: int, expected_result
     if value is not None:
         request.args = {"key": value}
     assert endpoint_utils.int_arg(request, "key", default) == expected_result
-
-
-async def test_endpoint_config_caches_session() -> None:
-    """Test that the EndpointConfig session is cached.
-
-    Assert identity of the session object, which should not be recreated when calling
-    the property `session` multiple times.
-    """
-    endpoint = endpoint_utils.EndpointConfig("https://example.com/")
-    session = endpoint.session
-
-    assert endpoint.session is session
-
-    # teardown
-    await endpoint.session.close()
-
-
-async def test_endpoint_config_constructor_does_not_create_session_cached_property() -> None:  # noqa: E501
-    """Test that the instantiation of EndpointConfig does not create the session cached property."""  # noqa: E501
-    endpoint = endpoint_utils.EndpointConfig("https://example.com/")
-
-    assert endpoint.__dict__.get("url") == "https://example.com/"
-    assert endpoint.__dict__.get("session") is None
-
-    # the property is created when it is accessed
-    async with endpoint.session as session:
-        assert session is not None
-
-    assert endpoint.__dict__.get("session") is session

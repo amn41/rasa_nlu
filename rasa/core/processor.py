@@ -66,7 +66,11 @@ from rasa.shared.nlu.constants import (
     ENTITIES,
     INTENT,
     INTENT_NAME_KEY,
+    INTENT_RESPONSE_KEY,
     PREDICTED_CONFIDENCE_KEY,
+    FULL_RETRIEVAL_INTENT_NAME_KEY,
+    RESPONSE_SELECTOR,
+    RESPONSE,
     TEXT,
 )
 from rasa.utils.endpoints import EndpointConfig
@@ -721,6 +725,7 @@ class MessageProcessor:
                 message, tracker, only_output_properties
             )
 
+        self._update_full_retrieval_intent(parse_data)
         structlogger.debug(
             "processor.message.parse",
             parse_data_text=copy.deepcopy(parse_data["text"]),
@@ -731,6 +736,23 @@ class MessageProcessor:
         self._check_for_unseen_features(parse_data)
 
         return parse_data
+
+    def _update_full_retrieval_intent(self, parse_data: Dict[Text, Any]) -> None:
+        """Update the parse data with the full retrieval intent.
+
+        Args:
+            parse_data: Message parse data to update.
+        """
+        intent_name = parse_data.get(INTENT, {}).get(INTENT_NAME_KEY)
+        response_selector = parse_data.get(RESPONSE_SELECTOR, {})
+        all_retrieval_intents = response_selector.get("all_retrieval_intents", [])
+        if intent_name and intent_name in all_retrieval_intents:
+            retrieval_intent = (
+                response_selector.get(intent_name, {})
+                .get(RESPONSE, {})
+                .get(INTENT_RESPONSE_KEY)
+            )
+            parse_data[INTENT][FULL_RETRIEVAL_INTENT_NAME_KEY] = retrieval_intent
 
     def _parse_message_with_graph(
         self,

@@ -30,6 +30,10 @@ PRERELEASE_FLAVORS = ("alpha", "rc")
 
 RELEASE_BRANCH_PATTERN = re.compile(r"^\d+\.\d+\.x$")
 
+PUBLIC_REMOTE = "public"
+DEFAULT_REMOTE = "origin"
+FIRST_CALM_VERSION = "3.7.0"
+
 
 def create_argument_parser() -> argparse.ArgumentParser:
     """Parse all the command line arguments for the release script."""
@@ -247,9 +251,9 @@ def create_commit(version: Version) -> None:
     check_call(["git", "commit", "-m", f"prepared release of version {version}"])
 
 
-def push_changes() -> None:
-    """Pushes the current branch to origin."""
-    check_call(["git", "push", "origin", "HEAD"])
+def push_changes(remote: str = DEFAULT_REMOTE) -> None:
+    """Pushes the current branch to the specified remote."""
+    check_call(["git", "push", remote, "HEAD"])
 
 
 def ensure_clean_git() -> None:
@@ -337,10 +341,11 @@ def main(args: argparse.Namespace) -> None:
         # never update changelog on a prerelease version
         generate_changelog(version)
 
+    remote = PUBLIC_REMOTE if str(version) < FIRST_CALM_VERSION else DEFAULT_REMOTE
     # alpha workflow on feature branch when a version bump is required
     if version.is_alpha and not git_current_branch_is_main_or_release():
         create_commit(version)
-        push_changes()
+        push_changes(remote)
 
         print_done_message_same_branch(version)
     else:
@@ -348,7 +353,7 @@ def main(args: argparse.Namespace) -> None:
         branch = create_release_branch(version)
 
         create_commit(version)
-        push_changes()
+        push_changes(remote)
 
         print_done_message(branch, base, version)
 

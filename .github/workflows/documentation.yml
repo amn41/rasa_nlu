@@ -82,7 +82,7 @@ jobs:
             echo "build_docs=true" >> $GITHUB_OUTPUT
           else
             # Get latest tagged Rasa version
-            git fetch --depth=1 origin "+refs/tags/*:refs/tags/*"
+            git describe --tags --match="3.6.[0-9]*" --abbrev=0 HEAD
             # Fetch branch history
             TAG_NAME=${GITHUB_REF#refs/tags/}
             git fetch --prune --unshallow

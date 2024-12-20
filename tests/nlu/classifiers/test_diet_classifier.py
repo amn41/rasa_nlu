@@ -971,24 +971,35 @@ async def test_no_bilou_when_entity_recognition_off(
 
 @pytest.mark.timeout(120, func_only=True)
 @pytest.mark.parametrize(
-    "batch_size, expected_num_batches",
+    "batch_size, expected_num_batches, drop_small_last_batch",
     # the training dataset has 48 NLU examples
     [
-        (1, 48),
-        (8, 6),
-        (15, 3),
-        (16, 3),
-        (18, 3),
-        (20, 2),
-        (32, 2),
-        (64, 1),
-        (128, 1),
-        (256, 1),
+        (1, 48, True),
+        (8, 6, True),
+        (15, 3, True),
+        (16, 3, True),
+        (18, 3, True),
+        (20, 2, True),
+        (32, 2, True),
+        (64, 1, True),
+        (128, 1, True),
+        (256, 1, True),
+        (1, 48, False),
+        (8, 6, False),
+        (15, 4, False),
+        (16, 3, False),
+        (18, 3, False),
+        (20, 3, False),
+        (32, 2, False),
+        (64, 1, False),
+        (128, 1, False),
+        (256, 1, False),
     ],
 )
 async def test_dropping_of_last_partial_batch(
     batch_size: int,
     expected_num_batches: int,
+    drop_small_last_batch: bool,
     create_diet: Callable[..., DIETClassifier],
     train_and_preprocess: Callable[..., Tuple[TrainingData, List[GraphComponent]]],
 ):
@@ -1012,7 +1023,9 @@ async def test_dropping_of_last_partial_batch(
     )
 
     model_data = diet.preprocess_train_data(training_data)
-    data_generator, _ = train_utils.create_data_generators(model_data, batch_size, 1)
+    data_generator, _ = train_utils.create_data_generators(
+        model_data, batch_size, 1, drop_small_last_batch=drop_small_last_batch
+    )
 
     assert len(data_generator) == expected_num_batches
 
@@ -1041,6 +1054,8 @@ async def test_dropping_of_last_partial_batch_empty_data(
     )
 
     model_data = diet.preprocess_train_data(training_data)
-    data_generator, _ = train_utils.create_data_generators(model_data, 64, 1)
+    data_generator, _ = train_utils.create_data_generators(
+        model_data, 64, 1, drop_small_last_batch=True
+    )
 
     assert len(data_generator) == 0

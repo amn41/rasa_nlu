@@ -70,7 +70,12 @@ from rasa.shared.core.events import (
 from rasa.core.http_interpreter import RasaNLUHttpInterpreter
 from rasa.core.processor import MessageProcessor
 from rasa.shared.core.trackers import DialogueStateTracker
-from rasa.shared.nlu.constants import INTENT_NAME_KEY, METADATA_MODEL_ID
+from rasa.shared.nlu.constants import (
+    INTENT,
+    INTENT_NAME_KEY,
+    FULL_RETRIEVAL_INTENT_NAME_KEY,
+    METADATA_MODEL_ID,
+)
 from rasa.shared.nlu.training_data.message import Message
 from rasa.utils.endpoints import EndpointConfig
 from rasa.shared.core.constants import (
@@ -1928,3 +1933,60 @@ async def test_run_anonymization_pipeline_mocked_pipeline(
     await processor.run_anonymization_pipeline(tracker)
 
     event_diff.assert_called_once()
+
+
+async def test_update_full_retrieval_intent(
+    default_processor: MessageProcessor,
+) -> None:
+    parse_data = {
+        "text": "I like sunny days in berlin",
+        "intent": {"name": "chitchat", "confidence": 0.9},
+        "entities": [],
+        "response_selector": {
+            "all_retrieval_intents": ["faq", "chitchat"],
+            "faq": {
+                "response": {
+                    "responses": [{"text": "Our return policy lasts 30 days."}],
+                    "confidence": 1.0,
+                    "intent_response_key": "faq/what_is_return_policy",
+                    "utter_action": "utter_faq/what_is_return_policy",
+                },
+                "ranking": [
+                    {
+                        "confidence": 1.0,
+                        "intent_response_key": "faq/what_is_return_policy",
+                    },
+                    {
+                        "confidence": 2.3378809862799945e-19,
+                        "intent_response_key": "faq/how_can_i_track_my_order",
+                    },
+                ],
+            },
+            "chitchat": {
+                "response": {
+                    "responses": [
+                        {
+                            "text": "The sun is out today! Isn't that great?",
+                        },
+                    ],
+                    "confidence": 1.0,
+                    "intent_response_key": "chitchat/ask_weather",
+                    "utter_action": "utter_chitchat/ask_weather",
+                },
+                "ranking": [
+                    {
+                        "confidence": 1.0,
+                        "intent_response_key": "chitchat/ask_weather",
+                    },
+                    {"confidence": 0.0, "intent_response_key": "chitchat/ask_name"},
+                ],
+            },
+        },
+    }
+
+    default_processor._update_full_retrieval_intent(parse_data)
+
+    assert parse_data[INTENT][INTENT_NAME_KEY] == "chitchat"
+    # assert that parse_data["intent"] has a key called response
+    assert FULL_RETRIEVAL_INTENT_NAME_KEY in parse_data[INTENT]
+    assert parse_data[INTENT][FULL_RETRIEVAL_INTENT_NAME_KEY] == "chitchat/ask_weather"

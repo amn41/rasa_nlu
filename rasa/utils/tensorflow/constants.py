@@ -113,3 +113,4 @@ EPOCH_OVERRIDE = "epoch_override"
 
 USE_GPU = "use_gpu"
 RUN_EAGERLY = "run_eagerly"
+DROP_SMALL_LAST_BATCH = "drop_small_last_batch"

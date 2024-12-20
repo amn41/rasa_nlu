@@ -21,7 +21,7 @@ variable "BASE_BUILDER_IMAGE_HASH" {
 # keep this in sync with the version in .github/poetry_version.txt
 # the variable is set automatically for builds in CI
 variable "POETRY_VERSION" {
-  default = "1.4.2"
+  default = "1.8.2"
 }
 
 group "base-images" {

@@ -12,10 +12,24 @@ In order to gather metrics on our system's ability to handle increased loads and
 In each test case we spawned the following number of concurrent users at peak concurrency using a [spawn rate](https://docs.locust.io/en/1.5.0/configuration.html#all-available-configuration-options) of 1000 users per second.
 In our tests we used the Rasa [HTTP-API](https://rasa.com/docs/rasa/pages/http-api) and the [Locust](https://locust.io/) open source load testing tool.
 
+
 |        Users             |               CPU                            |      Memory   |
 |--------------------------|----------------------------------------------|---------------|
 | Up to 50,000             |         6vCPU                                |      16 GB    |
 | Up to 80,000             |         6vCPU, with almost 90% CPU usage     |      16 GB    |
+
+
+### Some recommendations to improve latency
+- Sanic Workers must be mapped 1:1 to CPU for both Rasa Pro and Rasa Action Server
+- Create `async` actions to avoid any blocking I/O
+- `enable_selective_domain: true` : Domain is only sent for actions that needs it. This massively trims the payload between the two pods.
+- Consider using compute efficient machines on cloud which are optimized for high performance computing such as the C5 instances on AWS.
+  However, as they are low on memory, models need to be trained lightweight.
+
+
+|        Machine                 |               RasaPro                          |      Rasa Action Server                          |
+|--------------------------------|------------------------------------------------|--------------------------------------------------|
+| AWS C5 or Azure F or Gcloud C2 |   3-7vCPU, 10-16Gb Memory, 3-7 Sanic Threads   |    3-7vCPU, 2-12Gb Memory, 3-7 Sanic Threads     |
 
 
 ### Debugging bot related issues while scaling up

@@ -1,2 +1,2 @@
 # The poetry version is stored in a separate file due to the https://github.com/python-poetry/poetry/issues/3316
-poetry-version=1.4.2
+poetry-version=1.8.2

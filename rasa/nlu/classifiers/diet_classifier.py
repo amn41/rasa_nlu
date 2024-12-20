@@ -52,6 +52,7 @@ from rasa.shared.exceptions import InvalidConfigException
 from rasa.shared.nlu.training_data.training_data import TrainingData
 from rasa.shared.nlu.training_data.message import Message
 from rasa.utils.tensorflow.constants import (
+    DROP_SMALL_LAST_BATCH,
     LABEL,
     IDS,
     HIDDEN_LAYERS_SIZES,
@@ -289,6 +290,9 @@ class DIETClassifier(GraphComponent, IntentClassifier, EntityExtractorMixin):
             # a few steps, as the compilation of the graph tends to take more time than
             # running it. It is recommended to not adjust the optimization parameter.
             RUN_EAGERLY: False,
+            # Determines whether the last batch should be dropped if it contains fewer
+            # than half a batch size of examples
+            DROP_SMALL_LAST_BATCH: False,
         }
 
     def __init__(
@@ -932,6 +936,7 @@ class DIETClassifier(GraphComponent, IntentClassifier, EntityExtractorMixin):
             self.component_config[BATCH_STRATEGY],
             self.component_config[EVAL_NUM_EXAMPLES],
             self.component_config[RANDOM_SEED],
+            drop_small_last_batch=self.component_config[DROP_SMALL_LAST_BATCH],
         )
         callbacks = train_utils.create_common_callbacks(
             self.component_config[EPOCHS],

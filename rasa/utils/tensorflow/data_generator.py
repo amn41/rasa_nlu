@@ -344,6 +344,7 @@ class RasaBatchDataGenerator(RasaDataGenerator):
         epochs: int = 1,
         batch_strategy: Text = SEQUENCE,
         shuffle: bool = True,
+        drop_small_last_batch: bool = False,
     ):
         """Initializes the increasing batch size data generator.
 
@@ -353,6 +354,8 @@ class RasaBatchDataGenerator(RasaDataGenerator):
             epochs: The total number of epochs.
             batch_strategy: The batch strategy.
             shuffle: If 'True', data will be shuffled.
+            drop_small_last_batch: if 'True', the last batch in an epoch will be dropped
+                if it has less examples than half the batch size
         """
         super().__init__(model_data, batch_size, batch_strategy, shuffle)
 
@@ -370,6 +373,7 @@ class RasaBatchDataGenerator(RasaDataGenerator):
         self._current_batch_size = 0
         # create separate data variable that will store modified data for each batch
         self._data: Data = {}
+        self.drop_small_last_batch = drop_small_last_batch
         self.on_epoch_end()
 
     def __len__(self) -> int:
@@ -381,11 +385,16 @@ class RasaBatchDataGenerator(RasaDataGenerator):
         # data was rebalanced, so need to recalculate number of examples
         num_examples = self.model_data.number_of_examples(self._data)
         batch_size = self._current_batch_size
-        # keep last batch only if it has at least half a batch size of examples
-        last_batch_half_full = num_examples % batch_size >= math.ceil(batch_size / 2)
-        num_batches = num_examples // batch_size + int(last_batch_half_full)
-        # Return at least 1 if there is an example
-        return max(num_batches, int(num_examples > 0))
+        if self.drop_small_last_batch:
+            # keep last batch only if it has at least half a batch size of examples
+            last_batch_half_full = num_examples % batch_size >= math.ceil(
+                batch_size / 2
+            )
+            num_batches = num_examples // batch_size + int(last_batch_half_full)
+            # Return at least 1 if there is an example
+            return max(num_batches, int(num_examples > 0))
+        else:
+            return num_examples // batch_size + int(num_examples % batch_size > 0)
 
     def __getitem__(self, index: int) -> Tuple[Any, Any]:
         """Gets batch at position `index`.

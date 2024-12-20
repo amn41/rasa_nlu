@@ -16,17 +16,77 @@ https://github.com/RasaHQ/rasa/tree/main/changelog/ . -->
 
 <!-- TOWNCRIER -->
 
-## [3.6.12] - 2023-10-10
+## [3.6.20] - 2024-04-18
                         
-Rasa 3.6.12 (2023-10-10)                         
+Rasa 3.6.20 (2024-04-18)                         
+### Miscellaneous internal changes
+- [#13030](https://github.com/rasahq/rasa/issues/13030), [#13031](https://github.com/rasahq/rasa/issues/13031)
+
+
+## [3.6.19] - 2024-03-04
+                        
+Rasa 3.6.19 (2024-03-04)                         
+### Bugfixes
+- [#13019](https://github.com/rasahq/rasa/issues/13019): Changed the ordering of returned events to order by ID (previously timestamp) in SQL Tracker Store
+
+
+## [3.6.18] - 2024-02-23
+                        
+Rasa 3.6.18 (2024-02-23)                         
+### Bugfixes
+- [#13017](https://github.com/rasahq/rasa/issues/13017): Flush messages when Kafka producer is closed. This is to ensure that all messages in the producer's internal queue are sent to the broker.
+
+
+## [3.6.17] - 2024-02-13
+                        
+Rasa 3.6.17 (2024-02-13)                         
+### Miscellaneous internal changes
+- [#13007](https://github.com/rasahq/rasa/issues/13007)
+
+
+## [3.6.16] - 2024-01-19
+                        
+Rasa 3.6.16 (2024-01-19)                         
+### Bugfixes
+- [#12983](https://github.com/rasahq/rasa/issues/12983): Upgrade Cryptography to fix improper certificate validation.
+- [#12998](https://github.com/rasahq/rasa/issues/12998): Fixes a bug that caused the `full_retrieval_intent_name` key to be missing in the published event. Rasa Analytics makes use of this key to get the Retrieval Intent Name
+
+### Miscellaneous internal changes
+- [#712](https://github.com/rasahq/rasa/issues/712)
+
+
+## [3.6.15] - 2023-11-30
+
+Rasa 3.6.15 (2023-11-30)
+### Bugfixes
+- [#12965](https://github.com/rasahq/rasa/issues/12965): Fixed connection timeout to action server by setting KEEP_ALIVE_TIMEOUT to 120, and reverting changes introduced in #12886.
+
+
+## [3.6.14] - 2023-11-17
+
+Rasa 3.6.14 (2023-11-17)
+### Bugfixes
+- [#12948](https://github.com/rasahq/rasa/issues/12948): Fixed UnexpecTEDIntentlessPolicy training errors that resulted from a change to batching behavior. Changed the batching behavior back to the original for all components. Made the changed batching behavior accessible in DietClassifier using `drop_small_last_batch: True`.
+
+
+## [3.6.13] - 2023-10-23
+
+Rasa 3.6.13 (2023-10-23)
+### Bugfixes
+- [#12927](https://github.com/rasahq/rasa/issues/12927): Fix wrong conflicts that occur when rasa validate stories is run with slots that have active_loop set to null in mapping conditions.
+
+
+## [3.6.12] - 2023-10-10
+
+Rasa 3.6.12 (2023-10-10)
 ### Bugfixes
 - [#12904](https://github.com/rasahq/rasa/issues/12904): Refresh headers used in requests (e.g. action server requests) made by `EndpointConfig` using its `headers` attribute.
 - [#12906](https://github.com/rasahq/rasa/issues/12906): Upgrade `pillow` to `10.0.1` to address security vulnerability CVE-2023-4863 found in `10.0.0` version.
 
 
 ## [3.6.11] - 2023-10-05
-                        
-Rasa 3.6.11 (2023-10-05)                         
+
+Rasa 3.6.11 (2023-10-05)
 ### Bugfixes
 - [#12722](https://github.com/rasahq/rasa/issues/12722): Intent names will not be falsely abbreviated in interactive training (fixes OSS-413).
 
@@ -38,8 +98,8 @@ Rasa 3.6.11 (2023-10-05)
 
 
 ## [3.6.10] - 2023-09-26
-                        
-Rasa 3.6.10 (2023-09-26)                         
+
+Rasa 3.6.10 (2023-09-26)
 ### Improvements
 - [#12827](https://github.com/rasahq/rasa/issues/12827): Improved handling of last batch during DIET and TED training. The last batch is discarded if it contains less than half a batch size of data.
 - [#12852](https://github.com/rasahq/rasa/issues/12852): Added `username` to the connection parameters for `RedisLockStore` and `RedisTrackerStore`
@@ -50,8 +110,8 @@ Rasa 3.6.10 (2023-09-26)
 
 
 ## [3.6.9] - 2023-09-15
-                       
-Rasa 3.6.9 (2023-09-15)                        
+
+Rasa 3.6.9 (2023-09-15)
 ### Improvements
 - [#12778](https://github.com/rasahq/rasa/issues/12778): Added additional method `fingerprint_addon` to the `GraphComponent` interface to allow inclusion of external data into the fingerprint calculation of a component
 
@@ -60,29 +120,29 @@ Rasa 3.6.9 (2023-09-15)
 
 
 ## [3.6.8] - 2023-08-30
-                       
-Rasa 3.6.8 (2023-08-30)                         
+
+Rasa 3.6.8 (2023-08-30)
 
 No significant changes.
 
 
 ## [3.6.7] - 2023-08-29
-                       
-Rasa 3.6.7 (2023-08-29)                        
+
+Rasa 3.6.7 (2023-08-29)
 ### Bugfixes
 - [#12768](https://github.com/rasahq/rasa/issues/12768): Updated certifi, cryptography, and scipy packages to address security vulnerabilities.
 
 
 ## [3.6.6] - 2023-08-23
-                       
-Rasa 3.6.6 (2023-08-23)                        
+
+Rasa 3.6.6 (2023-08-23)
 ### Bugfixes
 - [#12755](https://github.com/rasahq/rasa/issues/12755): Updated setuptools and wheel to address security vulnerabilities.
 
 
 ## [3.6.5] - 2023-08-17
-                       
-Rasa 3.6.5 (2023-08-17)                        
+
+Rasa 3.6.5 (2023-08-17)
 ### Improvements
 - [#12696](https://github.com/rasahq/rasa/issues/12696): Use the same session across requests in `RasaNLUHttpInterpreter`
 
@@ -95,8 +155,8 @@ Rasa 3.6.5 (2023-08-17)
 
 
 ## [3.6.4] - 2023-07-21
-                       
-Rasa 3.6.4 (2023-07-21)                        
+
+Rasa 3.6.4 (2023-07-21)
 ### Bugfixes
 - [#12575](https://github.com/rasahq/rasa/issues/12575): Extract conditional response variation and channel variation filtering logic into a separate component.
   Enable usage of this component in the NaturalLanguageGenerator subclasses (e.g. CallbackNaturalLanguageGenerator, TemplatedNaturalLanguageGenerator).
@@ -107,8 +167,8 @@ Rasa 3.6.4 (2023-07-21)
 
 
 ## [3.6.3] - 2023-07-20
-                       
-Rasa 3.6.3 (2023-07-20)                        
+
+Rasa 3.6.3 (2023-07-20)
 ### Improvements
 - [#12637](https://github.com/rasahq/rasa/issues/12637): Added a human readable component to structlog using the `event_info` key and made it the default rendered key if present.
 
@@ -123,15 +183,15 @@ Rasa 3.6.3 (2023-07-20)
 
 
 ## [3.6.2] - 2023-07-06
-                       
-Rasa 3.6.2 (2023-07-06)                        
+
+Rasa 3.6.2 (2023-07-06)
 ### Bugfixes
 - [#12602](https://github.com/rasahq/rasa/issues/12602): Resolves the issue of importing TensorFlow on Docker for ARM64 architecture.
 
 
 ## [3.6.1] - 2023-07-03
-                       
-Rasa 3.6.1 (2023-07-03)                        
+
+Rasa 3.6.1 (2023-07-03)
 ### Improvements
 - [#12533](https://github.com/rasahq/rasa/issues/12533): Add building multi-platform Docker image (amd64/arm64)
 - [#12543](https://github.com/rasahq/rasa/issues/12543): Switch struct log to `FilteringBoundLogger` in order to retain log level set in the config.
@@ -153,8 +213,8 @@ Rasa 3.6.1 (2023-07-03)
 
 
 ## [3.6.0] - 2023-06-14
-                       
-Rasa 3.6.0 (2023-06-14)                        
+
+Rasa 3.6.0 (2023-06-14)
 ### Deprecations and Removals
 - [#12355](https://github.com/rasahq/rasa/issues/12355): Removed Python 3.7 support as [it reaches its end of life in June 2023](https://devguide.python.org/versions/)
 
@@ -197,6 +257,55 @@ Rasa 3.6.0 (2023-06-14)
 
 ### Miscellaneous internal changes
 - [#12291](https://github.com/rasahq/rasa/issues/12291), [#12329](https://github.com/rasahq/rasa/issues/12329), [#12332](https://github.com/rasahq/rasa/issues/12332), [#12365](https://github.com/rasahq/rasa/issues/12365), [#12372](https://github.com/rasahq/rasa/issues/12372), [#12386](https://github.com/rasahq/rasa/issues/12386), [#12492](https://github.com/rasahq/rasa/issues/12492)
+
+## [3.5.17] - 2023-12-05
+
+Rasa 3.5.17 (2023-12-05)
+### Improvements
+- [#12851](https://github.com/rasahq/rasa/issues/12851): Added `username` to the connection parameters for `RedisLockStore` and `RedisTrackerStore`
+- [#1493](https://github.com/rasahq/rasa/issues/1493): Telemetry data is only send for licensed users.
+
+
+## [3.5.16] - 2023-08-30
+
+Rasa 3.5.16 (2023-08-30)
+
+No significant changes.
+
+
+## [3.5.15] - 2023-07-21
+
+Rasa 3.5.15 (2023-07-21)
+
+No significant changes.
+
+
+## [3.5.14] - 2023-07-12
+
+Rasa 3.5.14 (2023-07-12)
+### Bugfixes
+- [#12639](https://github.com/rasahq/rasa/issues/12639): Fix the issue with the most recent model not being selected if the owner or permissions where modified on the model file.
+
+### Miscellaneous internal changes
+- [#12649](https://github.com/rasahq/rasa/issues/12649)
+
+
+## [3.5.13] - 2023-07-05
+
+Rasa 3.5.13 (2023-07-05)
+### Bugfixes
+- [#12549](https://github.com/rasahq/rasa/issues/12549): Introduce a validation step in `rasa data validate` command to identify non-existent paths and empty domains.
+
+
+## [3.5.12] - 2023-06-23
+
+Rasa 3.5.12 (2023-06-23)
+### Bugfixes
+- [#12534](https://github.com/rasahq/rasa/issues/12534): Rich responses containing buttons with parentheses characters are now correctly parsed.
+  Previously any characters found between the first identified pair of `()` in response button took precedence.
+
+### Miscellaneous internal changes
+- [#12512](https://github.com/rasahq/rasa/issues/12512)
 
 
 ## [3.5.11] - 2023-06-08

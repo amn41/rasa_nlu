@@ -2,7 +2,7 @@
 
 JOBS ?= 1
 INTEGRATION_TEST_FOLDER = tests/integration_tests/
-INTEGRATION_TEST_PYTEST_MARKERS ?= "sequential or not sequential"
+INTEGRATION_TEST_PYTEST_MARKERS ?= "sequential or broker or ((not sequential) and (not broker))"
 PLATFORM ?= "linux/amd64"
 
 help:
