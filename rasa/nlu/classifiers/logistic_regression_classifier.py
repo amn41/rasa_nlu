@@ -165,7 +165,6 @@ class LogisticRegressionClassifier(IntentClassifier, GraphComponent):
             sio.dump(self.clf, path)
             logger.debug(f"Saved intent classifier to '{path}'.")
 
-
     @classmethod
     def load(
         cls,

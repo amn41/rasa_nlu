@@ -77,7 +77,9 @@ def _serialize_nested_data(
                     array_metadata["features"],
                 )
 
-            inner_metadata["components"].append(array_metadata)  # type:ignore[attr-defined]
+            inner_metadata["components"].append(
+                array_metadata
+            )  # type:ignore[attr-defined]
 
         metadata.append(inner_metadata)
 
