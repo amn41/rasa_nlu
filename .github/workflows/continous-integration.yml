@@ -275,7 +275,7 @@ jobs:
         shell: bash
 
       - name: Install poetry (Ubuntu) 🦄
-        if: needs.changes.outputs.backend == 'true' && matrix.os == 'ubuntu-22.04'
+        if: needs.changes.outputs.backend == 'true' && matrix.os == 'ubuntu-24.04'
         uses: snok/install-poetry@93ada01c735cc8a383ce0ce2ae205a21c415379b
         with:
           version: ${{ env.POETRY_VERSION }}
@@ -441,7 +441,7 @@ jobs:
         shell: bash
 
       - name: Install poetry (Ubuntu) 🦄
-        if: needs.changes.outputs.backend == 'true' && matrix.os == 'ubuntu-22.04'
+        if: needs.changes.outputs.backend == 'true' && matrix.os == 'ubuntu-24.04'
         uses: snok/install-poetry@93ada01c735cc8a383ce0ce2ae205a21c415379b
         with:
           version: ${{ env.POETRY_VERSION }}
