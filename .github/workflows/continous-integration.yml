@@ -231,6 +231,9 @@ jobs:
 
   test:
     name: Run Tests
+    defaults:
+      run:
+        shell: bash
     if: github.ref_type != 'tag'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
