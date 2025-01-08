@@ -127,7 +127,7 @@ prepare-tests-macos:
 	brew install wget graphviz || true
 
 prepare-tests-ubuntu:
-	sudo apt-get -y install graphviz graphviz-dev python-tk
+	sudo apt-get update && sudo apt-get -y install graphviz graphviz-dev python3-tk
 
 prepare-tests-windows:
 	choco install wget graphviz
