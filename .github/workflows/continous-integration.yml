@@ -402,7 +402,7 @@ jobs:
         with:
           name: ${{ matrix.test }}-${{ matrix.python-version }}-${{ matrix.os }}-coverage
           path: |
-            ${{ github.workspace }}/${{ matrix.test }}-${{ matrix.python-version }}-${{ matrix.os }}-coverage
+            ${{ github.workspace }}/test_coverage
 
   test-flaky:
     name: Run Flaky Tests
@@ -557,7 +557,7 @@ jobs:
         with:
           name: ${{ matrix.test }}-${{ matrix.python-version }}-${{ matrix.os }}-coverage
           path: |
-            ${{ github.workspace }}/${{ matrix.test }}-${{ matrix.python-version }}-${{ matrix.os }}-coverage
+            ${{ github.workspace }}/test_coverage
 
   upload_coverage_reports:
     name: Upload coverage reports to codeclimate
@@ -582,7 +582,7 @@ jobs:
         if: needs.changes.outputs.backend == 'true'
         uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 #v4.1.8
         with:
-          path: ${{ github.workspace }}/tests_coverage
+          path: ${{ github.workspace }}/test_coverage
 
       - name: Merge all reports
         if: needs.changes.outputs.backend == 'true'
