@@ -391,18 +391,21 @@ jobs:
           DD_ARGS: --ddtrace --ddtrace-patch-all
         run: |
           make ${{ matrix.test }}
-          if [[ "${{ matrix.os }}" != "windows-2019" ]]; then
-            mv .coverage ${{ github.workspace }}/${{ matrix.test }}-coverage
-          fi
         shell: bash # bash shell is a way to make code run for both Linux and Windows
+
+      - name: Move coverage report
+        if: needs.changes.outputs.backend == 'true' && matrix.os == 'ubuntu-24.04'
+        run: |
+          mv .coverage ${{ github.workspace }}/.coverage.${{ matrix.test }}
 
       - name: Store coverage reports
         if: needs.changes.outputs.backend == 'true' && matrix.os == 'ubuntu-24.04'
         uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 #v4.4.3
         with:
           name: ${{ matrix.test }}-${{ matrix.python-version }}-${{ matrix.os }}-coverage
+          include-hidden-files: true
           path: |
-            ${{ github.workspace }}/${{ matrix.test }}-${{ matrix.python-version }}-${{ matrix.os }}-coverage
+            ${{ github.workspace }}/.coverage.${{ matrix.test }}
 
   test-flaky:
     name: Run Flaky Tests
@@ -546,18 +549,21 @@ jobs:
           DD_ARGS: --ddtrace --ddtrace-patch-all
         run: |
           make test-flaky
-          if [[ "${{ matrix.os }}" != "windows-2019" ]]; then
-            mv .coverage ${{ github.workspace }}/test-flaky-coverage
-          fi
         shell: bash # bash shell is a way to make code run for both Linux and Windows
+
+      - name: Move coverage report
+        if: needs.changes.outputs.backend == 'true' && matrix.os == 'ubuntu-24.04'
+        run: |
+          mv .coverage ${{ github.workspace }}/.coverage.test_flaky_coverage
 
       - name: Store coverage reports
         if: needs.changes.outputs.backend == 'true' && matrix.os == 'ubuntu-24.04'
-        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 #v4.4.3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.test }}-${{ matrix.python-version }}-${{ matrix.os }}-coverage
+          include-hidden-files: true
           path: |
-            ${{ github.workspace }}/${{ matrix.test }}-${{ matrix.python-version }}-${{ matrix.os }}-coverage
+            ${{ github.workspace }}/.coverage.test_flaky_coverage
 
   upload_coverage_reports:
     name: Upload coverage reports to codeclimate
@@ -566,6 +572,7 @@ jobs:
     # Always upload results even if tests failed
     needs:
       - test
+      - test-flaky
       - changes
 
     steps:
@@ -580,25 +587,23 @@ jobs:
 
       - name: Get backend coverage reports
         if: needs.changes.outputs.backend == 'true'
-        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 #v4.1.8
+        uses: actions/download-artifact@v4 #v4.1.8
         with:
           path: ${{ github.workspace }}/tests_coverage
+          pattern: "*-coverage"
+          merge-multiple: true
+
+      - name: List all coverages
+        if: needs.changes.outputs.backend == 'true'
+        run: |
+          ls -l ${{ github.workspace }}
+          ls -l ${{ github.workspace }}/tests_coverage
 
       - name: Merge all reports
         if: needs.changes.outputs.backend == 'true'
         run: |
-          subs=`ls ${{ github.workspace }}/tests_coverage`
-          download_dir="${{ github.workspace }}/tests_coverage"
-          final_dir="${{ github.workspace }}/tests_coverage/final"
-
-          # Downloaded artifacts go into folders, gotta extract them all into one folder for upload
-          mkdir "${final_dir}/"
-          for i in $subs; do
-            mv "${download_dir}/$i"/* "${final_dir}/"
-          done
-
           pip install coverage
-          coverage combine "${final_dir}/"*
+          coverage combine ${{ github.workspace }}/tests_coverage/
           coverage xml
 
       - name: Upload reports to codeclimate
