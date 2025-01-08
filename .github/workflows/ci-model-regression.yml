@@ -27,7 +27,7 @@ jobs:
   read_test_configuration:
     name: Reads tests configuration
     if: ${{ github.repository == 'RasaHQ/rasa' && contains(github.event.pull_request.labels.*.name, 'status:model-regression-tests') }}
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
       matrix_length: ${{ steps.set-matrix.outputs.matrix_length }}
@@ -158,7 +158,7 @@ jobs:
   deploy_runner_gpu:
     name: Deploy Github Runner - GPU
     needs: read_test_configuration
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     if: ${{ contains(github.event.pull_request.labels.*.name, 'runner:gpu') && github.repository == 'RasaHQ/rasa' && contains(github.event.pull_request.labels.*.name, 'status:model-regression-tests') && needs.read_test_configuration.outputs.configuration_id != '' }}
 
     steps:
@@ -492,7 +492,7 @@ jobs:
       - read_test_configuration
     env:
       ACCELERATOR_TYPE: "CPU"
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     strategy:
       max-parallel: 3
       matrix: ${{fromJson(needs.read_test_configuration.outputs.matrix)}}
@@ -733,7 +733,7 @@ jobs:
 
   combine_reports:
     name: Combine reports
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs:
       - model_regression_test_cpu
       - model_regression_test_gpu
@@ -790,7 +790,7 @@ jobs:
 
   set_job_success_status:
     name: Set job success status
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs:
       - combine_reports
     if: ${{ always() && needs.combine_reports.result == 'success' }}
@@ -807,7 +807,7 @@ jobs:
 
   add_comment_results:
     name: Add a comment with the results
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs:
       - combine_reports
     if: ${{ always() && needs.combine_reports.result == 'success' }}
@@ -901,7 +901,7 @@ jobs:
     needs:
       - deploy_runner_gpu
       - model_regression_test_gpu
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     if: ${{ always() && needs.deploy_runner_gpu.result != 'skipped' && contains(github.event.pull_request.labels.*.name, 'runner:gpu') && contains(github.event.pull_request.labels.*.name, 'status:model-regression-tests') }}
 
     steps:

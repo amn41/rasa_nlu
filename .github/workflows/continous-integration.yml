@@ -44,7 +44,7 @@ env:
 jobs:
   changes:
     name: Check for file changes
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     outputs:
       # Both of the outputs below are strings but only one exists at any given time
       backend: ${{ steps.changed-files.outputs.backend || steps.run-all.outputs.backend }}
@@ -87,7 +87,7 @@ jobs:
     # Runs on pushes to main exclusively
     name: Wait for docs tests
     if: github.ref_type != 'tag'
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: [changes]
 
     steps:
@@ -110,7 +110,7 @@ jobs:
   quality:
     name: Code Quality
     if: github.ref_type != 'tag'
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: [changes]
 
     steps:
@@ -132,14 +132,12 @@ jobs:
 
       - name: Install poetry 🦄
         if: needs.changes.outputs.backend == 'true'
-        uses: Gr1N/setup-poetry@15821dc8a61bc630db542ae4baf6a7c19a994844 # v8
+        uses: snok/install-poetry@93ada01c735cc8a383ce0ce2ae205a21c415379b
         with:
-          poetry-version: ${{ env.POETRY_VERSION }}
-
-      - name: Inject setuptools into poetry's runtime environment
-        if: needs.changes.outputs.backend == 'true'
-        run: |
-          poetry self add setuptools
+          version: ${{ env.POETRY_VERSION }}
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+          installer-parallel: true
 
       - name: Load Poetry Cached Libraries ⬇
         id: cache-poetry
@@ -210,7 +208,7 @@ jobs:
 
   changelog:
     name: Check for changelog
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout git repository 🕝
@@ -249,7 +247,7 @@ jobs:
           - test-full-model-training
           - test-other-unit-tests
           - test-performance
-        os: [ubuntu-22.04, windows-2019]
+        os: [ubuntu-24.04, windows-2019]
         python-version: [3.8, 3.9, "3.10"]
 
     steps:
@@ -276,16 +274,20 @@ jobs:
           echo "POETRY_VERSION=$(scripts/poetry-version.sh)" >> $GITHUB_ENV
         shell: bash
 
-      - name: Install poetry 🦄
-        if: needs.changes.outputs.backend == 'true'
-        uses: Gr1N/setup-poetry@15821dc8a61bc630db542ae4baf6a7c19a994844 # v8
+      - name: Install poetry (Ubuntu) 🦄
+        if: needs.changes.outputs.backend == 'true' && matrix.os == 'ubuntu-24.04'
+        uses: snok/install-poetry@93ada01c735cc8a383ce0ce2ae205a21c415379b
+        with:
+          version: ${{ env.POETRY_VERSION }}
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+          installer-parallel: true
+
+      - name: Install poetry (Windows) 🦄
+        if: needs.changes.outputs.backend == 'true' && matrix.os == 'windows-2019'
+        uses: Gr1N/setup-poetry@48b0f77c8c1b1b19cb962f0f00dff7b4be8f81ec #v9
         with:
           poetry-version: ${{ env.POETRY_VERSION }}
-
-      - name: Inject setuptools into poetry's runtime environment
-        if: needs.changes.outputs.backend == 'true'
-        run: |
-          poetry self add setuptools
 
       - name: Prevent race condition in poetry build
         # More context about race condition during poetry build can be found here:
@@ -323,7 +325,7 @@ jobs:
         run: poetry config virtualenvs.in-project true
 
       - name: Install Dependencies (Linux) 📦
-        if: needs.changes.outputs.backend == 'true' && matrix.os == 'ubuntu-22.04'
+        if: needs.changes.outputs.backend == 'true' && matrix.os == 'ubuntu-24.04'
         # Poetry intermittently fails to install dependency if it is not PEP 517 compliant
         # This is a workaround for that issue
         run: |
@@ -351,7 +353,7 @@ jobs:
           make prepare-tests-windows-gha
 
       - name: Add github workflow problem matchers
-        if: needs.changes.outputs.backend == 'true' && matrix.python-version == 3.7 && matrix.os == 'ubuntu-22.04'
+        if: needs.changes.outputs.backend == 'true' && matrix.python-version == 3.7 && matrix.os == 'ubuntu-24.04'
         # only annotate based on test runs on ubuntu: otherwise
         # all errors will be duplicated for each python / os combination
         # therefore, we only enable for the one where most tests are run
@@ -370,7 +372,7 @@ jobs:
           Set-ItemProperty 'HKLM:\System\CurrentControlSet\Control\FileSystem' -Name 'LongPathsEnabled' -value 0
 
       - name: Install ddtrace on Linux
-        if: needs.changes.outputs.backend == 'true' && matrix.os == 'ubuntu-22.04'
+        if: needs.changes.outputs.backend == 'true' && matrix.os == 'ubuntu-24.04'
         run: poetry run pip install -U 'ddtrace<2.0.0'
 
       - name: Install ddtrace on Windows
@@ -395,12 +397,12 @@ jobs:
         shell: bash # bash shell is a way to make code run for both Linux and Windows
 
       - name: Store coverage reports
-        if: needs.changes.outputs.backend == 'true' && matrix.os == 'ubuntu-22.04'
+        if: needs.changes.outputs.backend == 'true' && matrix.os == 'ubuntu-24.04'
         uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 #v4.4.3
         with:
-          name: ${{ matrix.test }}-coverage
+          name: ${{ matrix.test }}-${{ matrix.python-version }}-${{ matrix.os }}-coverage
           path: |
-            ${{ github.workspace }}/${{ matrix.test }}-coverage
+            ${{ github.workspace }}/test_coverage
 
   test-flaky:
     name: Run Flaky Tests
@@ -411,7 +413,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, windows-2019]
+        os: [ubuntu-24.04, windows-2019]
         python-version: [3.8, 3.9, "3.10"]
 
     steps:
@@ -438,16 +440,20 @@ jobs:
           echo "POETRY_VERSION=$(scripts/poetry-version.sh)" >> $GITHUB_ENV
         shell: bash
 
-      - name: Install poetry 🦄
-        if: needs.changes.outputs.backend == 'true'
-        uses: Gr1N/setup-poetry@15821dc8a61bc630db542ae4baf6a7c19a994844 # v8
+      - name: Install poetry (Ubuntu) 🦄
+        if: needs.changes.outputs.backend == 'true' && matrix.os == 'ubuntu-24.04'
+        uses: snok/install-poetry@93ada01c735cc8a383ce0ce2ae205a21c415379b
+        with:
+          version: ${{ env.POETRY_VERSION }}
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+          installer-parallel: true
+
+      - name: Install poetry (Windows) 🦄
+        if: needs.changes.outputs.backend == 'true' && matrix.os == 'windows-2019'
+        uses: Gr1N/setup-poetry@48b0f77c8c1b1b19cb962f0f00dff7b4be8f81ec #v9
         with:
           poetry-version: ${{ env.POETRY_VERSION }}
-
-      - name: Inject setuptools into poetry's runtime environment
-        if: needs.changes.outputs.backend == 'true'
-        run: |
-          poetry self add setuptools
 
       - name: Load Poetry Cached Libraries ⬇
         id: cache-poetry
@@ -478,7 +484,7 @@ jobs:
         run: poetry config virtualenvs.in-project true
 
       - name: Install Dependencies (Linux) 📦
-        if: needs.changes.outputs.backend == 'true' && matrix.os == 'ubuntu-22.04'
+        if: needs.changes.outputs.backend == 'true' && matrix.os == 'ubuntu-24.04'
         run: |
           sudo apt-get -y install libpq-dev
           make install-full | tee .output
@@ -502,7 +508,7 @@ jobs:
           make prepare-tests-windows-gha
 
       - name: Add github workflow problem matchers
-        if: needs.changes.outputs.backend == 'true' && matrix.python-version == 3.7 && matrix.os == 'ubuntu-22.04'
+        if: needs.changes.outputs.backend == 'true' && matrix.python-version == 3.7 && matrix.os == 'ubuntu-24.04'
         # only annotate based on test runs on ubuntu: otherwise
         # all errors will be duplicated for each python / os combination
         # therefore, we only enable for the one where most tests are run
@@ -521,7 +527,7 @@ jobs:
           Set-ItemProperty 'HKLM:\System\CurrentControlSet\Control\FileSystem' -Name 'LongPathsEnabled' -value 0
 
       - name: Install ddtrace on Linux
-        if: needs.changes.outputs.backend == 'true' && matrix.os == 'ubuntu-22.04'
+        if: needs.changes.outputs.backend == 'true' && matrix.os == 'ubuntu-24.04'
         run: poetry run pip install -U 'ddtrace<2.0.0'
 
       - name: Install ddtrace on Windows
@@ -546,17 +552,17 @@ jobs:
         shell: bash # bash shell is a way to make code run for both Linux and Windows
 
       - name: Store coverage reports
-        if: needs.changes.outputs.backend == 'true' && matrix.os == 'ubuntu-22.04'
+        if: needs.changes.outputs.backend == 'true' && matrix.os == 'ubuntu-24.04'
         uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 #v4.4.3
         with:
-          name: ${{ matrix.test }}-coverage
+          name: ${{ matrix.test }}-${{ matrix.python-version }}-${{ matrix.os }}-coverage
           path: |
-            ${{ github.workspace }}/${{ matrix.test }}-coverage
+            ${{ github.workspace }}/test_coverage
 
   upload_coverage_reports:
     name: Upload coverage reports to codeclimate
     if: github.ref_type != 'tag'
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     # Always upload results even if tests failed
     needs:
       - test
@@ -576,7 +582,7 @@ jobs:
         if: needs.changes.outputs.backend == 'true'
         uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 #v4.1.8
         with:
-          path: ${{ github.workspace }}/tests_coverage
+          path: ${{ github.workspace }}/test_coverage
 
       - name: Merge all reports
         if: needs.changes.outputs.backend == 'true'
@@ -608,7 +614,7 @@ jobs:
   integration_test:
     name: Run Non-Sequential Integration Tests
     if: github.ref_type != 'tag'
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     needs: [changes]
     env:
@@ -678,9 +684,12 @@ jobs:
 
       - name: Install poetry 🦄
         if: needs.changes.outputs.backend == 'true'
-        uses: Gr1N/setup-poetry@15821dc8a61bc630db542ae4baf6a7c19a994844 # v8
+        uses: snok/install-poetry@93ada01c735cc8a383ce0ce2ae205a21c415379b
         with:
-          poetry-version: ${{ env.POETRY_VERSION }}
+          version: ${{ env.POETRY_VERSION }}
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+          installer-parallel: true
 
       - name: Load Poetry Cached Libraries ⬇
         id: cache-poetry
@@ -730,7 +739,7 @@ jobs:
   broker_integration_test:
     name: Run Broker Integration Tests
     if: github.ref_type != 'tag'
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     needs: [changes]
     env:
@@ -765,9 +774,12 @@ jobs:
 
       - name: Install poetry 🦄
         if: needs.changes.outputs.backend == 'true'
-        uses: Gr1N/setup-poetry@15821dc8a61bc630db542ae4baf6a7c19a994844 # v8
+        uses: snok/install-poetry@93ada01c735cc8a383ce0ce2ae205a21c415379b
         with:
-          poetry-version: ${{ env.POETRY_VERSION }}
+          version: ${{ env.POETRY_VERSION }}
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+          installer-parallel: true
 
       - name: Load Poetry Cached Libraries ⬇
         id: cache-poetry
@@ -809,7 +821,7 @@ jobs:
       - name: Run kafka and zookeeper containers for integration testing
         if: needs.changes.outputs.backend == 'true'
         run: |
-          docker-compose -f tests_deployment/docker-compose.kafka.yml up -d
+          docker compose -f tests_deployment/docker-compose.kafka.yml up -d
 
       - name: Test Code with Services 🩺
         if: needs.changes.outputs.backend == 'true'
@@ -823,12 +835,12 @@ jobs:
       - name: Stop kafka and zookeeper containers for integration testing
         if: needs.changes.outputs.backend == 'true'
         run: |
-          docker-compose -f tests_deployment/docker-compose.kafka.yml down
+          docker compose -f tests_deployment/docker-compose.kafka.yml down
 
   sequential_integration_test:
     name: Run Sequential Integration Tests
     if: github.ref_type != 'tag'
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     needs: [changes]
     env:
@@ -873,9 +885,12 @@ jobs:
 
       - name: Install poetry 🦄
         if: needs.changes.outputs.backend == 'true'
-        uses: Gr1N/setup-poetry@15821dc8a61bc630db542ae4baf6a7c19a994844 # v8
+        uses: snok/install-poetry@93ada01c735cc8a383ce0ce2ae205a21c415379b
         with:
-          poetry-version: ${{ env.POETRY_VERSION }}
+          version: ${{ env.POETRY_VERSION }}
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+          installer-parallel: true
 
       - name: Load Poetry Cached Libraries ⬇
         id: cache-poetry
@@ -926,7 +941,7 @@ jobs:
 
   build_docker_base_images_and_set_env:
     name: Build Docker base images and setup environment
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     outputs:
       base_image_hash: ${{ steps.check_image.outputs.base_image_hash }}
       base_mitie_image_hash: ${{ steps.check_image.outputs.base_mitie_image_hash }}
@@ -1109,7 +1124,7 @@ jobs:
 
   docker:
     name: Build Docker
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: [changes, build_docker_base_images_and_set_env]
     env:
       IMAGE_TAG: ${{ needs.build_docker_base_images_and_set_env.outputs.image_tag }}
@@ -1211,7 +1226,7 @@ jobs:
 
   deploy:
     name: Deploy to PyPI
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
 
     # deploy will only be run when there is a tag available
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags') && github.repository == 'RasaHQ/rasa'
@@ -1232,9 +1247,12 @@ jobs:
         shell: bash
 
       - name: Install poetry 🦄
-        uses: Gr1N/setup-poetry@15821dc8a61bc630db542ae4baf6a7c19a994844 # v8
+        uses: snok/install-poetry@93ada01c735cc8a383ce0ce2ae205a21c415379b
         with:
-          poetry-version: ${{ env.POETRY_VERSION }}
+          version: ${{ env.POETRY_VERSION }}
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+          installer-parallel: true
 
       - name: Copy Segment write key to the package
         env:
@@ -1287,7 +1305,7 @@ jobs:
 
   send_slack_notification_for_release_on_failure:
     name: Notify Slack & Publish Release Notes
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     # run this job when the workflow is triggered by a tag push
     if: always() && github.repository == 'RasaHQ/rasa' && github.ref_type == 'tag'
     needs:

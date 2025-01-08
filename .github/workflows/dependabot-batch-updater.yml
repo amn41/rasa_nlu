@@ -6,7 +6,7 @@ on:
 
 jobs:
   update_dependencies:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     name: Update dependencies
     steps:
       - uses: RasaHQ/dependabot-batch-updater@f049cbb0bbd3754bcb5ab154a79f00cd780fc633 # v1.0
