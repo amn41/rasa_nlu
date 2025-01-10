@@ -2,12 +2,13 @@ import asyncio
 import filecmp
 import logging
 import os
+import re
 import tempfile
 import warnings
-import re
 from asyncio import AbstractEventLoop
 from pathlib import Path
-from typing import Text, Any, Union, List, Type, Callable, TYPE_CHECKING, Pattern
+from typing import Text, Any, List, Type, Callable, TYPE_CHECKING, Pattern
+
 from typing_extensions import Protocol
 
 import rasa.shared.constants
@@ -100,7 +101,6 @@ def create_temporary_directory() -> Text:
 
 def create_path(file_path: Text) -> None:
     """Makes sure all directories in the 'file_path' exists."""
-
     parent_dir = os.path.dirname(os.path.abspath(file_path))
     if not os.path.exists(parent_dir):
         os.makedirs(parent_dir)
@@ -136,8 +136,8 @@ def create_validator(
     function: Callable[[Text], bool], error_message: Text
 ) -> Type["Validator"]:
     """Helper method to create `Validator` classes from callable functions. Should be
-    removed when questionary supports `Validator` objects."""
-
+    removed when questionary supports `Validator` objects.
+    """
     from prompt_toolkit.validation import Validator, ValidationError
     from prompt_toolkit.document import Document
 

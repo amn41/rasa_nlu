@@ -1,7 +1,6 @@
 import logging
 from typing import Any, Text, Dict, List, Type, Tuple
 
-import structlog
 from scipy.sparse import hstack, vstack, csr_matrix
 from sklearn.linear_model import LogisticRegression
 
@@ -184,7 +183,8 @@ class LogisticRegressionClassifier(IntentClassifier, GraphComponent):
 
                 if unknown_types:
                     logger.debug(
-                        f"Untrusted types ({unknown_types}) found when loading {classifier_file}!",
+                        f"Untrusted types ({unknown_types}) found when "
+                        f"loading {classifier_file}!",
                     )
                     raise ValueError()
 

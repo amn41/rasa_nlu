@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import pytest
 from _pytest.tmpdir import TempPathFactory
 from prompt_toolkit.document import Document

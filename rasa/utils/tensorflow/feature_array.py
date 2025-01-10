@@ -1,9 +1,9 @@
 from typing import Dict, Any, List, Tuple, Optional, Union
 
-from safetensors.numpy import save_file
 import numpy as np
-from safetensors.numpy import load_file
 import scipy.sparse
+from safetensors.numpy import load_file
+from safetensors.numpy import save_file
 
 import rasa.shared.utils.io
 
@@ -77,9 +77,9 @@ def _serialize_nested_data(
                     array_metadata["features"],
                 )
 
-            inner_metadata["components"].append(
+            inner_metadata["components"].append(  # type:ignore[attr-defined]
                 array_metadata
-            )  # type:ignore[attr-defined]
+            )
 
         metadata.append(inner_metadata)
 
@@ -236,7 +236,9 @@ class FeatureArray(np.ndarray):
             return
 
         self.units = getattr(obj, "units", None)
-        self.number_of_dimensions = getattr(obj, "number_of_dimensions", None)  # type: ignore[assignment]
+        self.number_of_dimensions = getattr(
+            obj, "number_of_dimensions", None
+        )  # type: ignore[assignment]
         self.is_sparse = getattr(obj, "is_sparse", None)
 
         default_attributes = {

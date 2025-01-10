@@ -6,7 +6,6 @@ from typing import Any, Dict, List, Optional, Text, Tuple, Set, Type, Union
 
 import numpy as np
 import scipy.sparse
-from sklearn.exceptions import NotFittedError
 from sklearn.feature_extraction.text import CountVectorizer
 
 import rasa.shared.utils.io
@@ -14,14 +13,6 @@ from rasa.engine.graph import GraphComponent, ExecutionContext
 from rasa.engine.recipes.default_recipe import DefaultV1Recipe
 from rasa.engine.storage.resource import Resource
 from rasa.engine.storage.storage import ModelStorage
-from rasa.nlu.featurizers.sparse_featurizer.sparse_featurizer import SparseFeaturizer
-from rasa.nlu.utils.spacy_utils import SpacyModel
-from rasa.shared.constants import DOCS_URL_COMPONENTS
-import rasa.utils.io as io_utils
-from sklearn.feature_extraction.text import CountVectorizer
-from rasa.shared.nlu.training_data.training_data import TrainingData
-from rasa.shared.nlu.training_data.message import Message
-from rasa.shared.exceptions import RasaException, FileIOException
 from rasa.nlu.constants import (
     TOKENS_NAMES,
     MESSAGE_ATTRIBUTES,
