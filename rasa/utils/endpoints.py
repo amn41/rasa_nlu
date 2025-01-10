@@ -89,6 +89,7 @@ class EndpointConfig:
         token: Optional[Text] = None,
         token_name: Text = "token",
         cafile: Optional[Text] = None,
+        client_timeout: Optional[Dict[Text, Any]] = None,
         **kwargs: Any,
     ) -> None:
         """Creates an `EndpointConfig` instance."""
@@ -100,6 +101,7 @@ class EndpointConfig:
         self.token_name = token_name
         self.type = kwargs.pop("store_type", kwargs.pop("type", None))
         self.cafile = cafile
+        self.client_timeout = client_timeout or {"total": DEFAULT_REQUEST_TIMEOUT}
         self.kwargs = kwargs
 
     def session(self) -> aiohttp.ClientSession:
@@ -115,7 +117,7 @@ class EndpointConfig:
         return aiohttp.ClientSession(
             headers=self.headers,
             auth=auth,
-            timeout=aiohttp.ClientTimeout(total=DEFAULT_REQUEST_TIMEOUT),
+            timeout=aiohttp.ClientTimeout(**self.client_timeout),
         )
 
     def combine_parameters(
@@ -203,6 +205,7 @@ class EndpointConfig:
             self.basic_auth,
             self.token,
             self.token_name,
+            self.client_timeout,
             **self.kwargs,
         )
 

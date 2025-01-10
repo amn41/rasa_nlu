@@ -12,7 +12,6 @@ from aiohttp import ClientError
 
 from rasa.core import jobs
 from rasa.core.channels.channel import OutputChannel, UserMessage
-from rasa.core.constants import DEFAULT_REQUEST_TIMEOUT
 from rasa.core.http_interpreter import RasaNLUHttpInterpreter
 from rasa.shared.core.domain import Domain
 from rasa.core.exceptions import AgentNotReady
@@ -118,7 +117,6 @@ async def _pull_model_and_fingerprint(
             async with session.request(
                 "GET",
                 model_server.url,
-                timeout=DEFAULT_REQUEST_TIMEOUT,
                 headers=headers,
                 params=params,
             ) as resp:
