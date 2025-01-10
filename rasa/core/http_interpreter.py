@@ -37,7 +37,7 @@ class RasaNLUHttpInterpreter:
             "text": "",
         }
 
-        result = await self._rasa_http_parse(message.text, message.sender_id)
+        result = await self._rasa_http_parse(message.text, message.message_id)
         return result if result is not None else default_return
 
     async def _rasa_http_parse(
