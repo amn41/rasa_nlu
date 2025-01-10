@@ -8,6 +8,7 @@ import shutil
 import tempfile
 import warnings
 from pathlib import Path
+from socket import SOCK_DGRAM, SOCK_STREAM
 from types import TracebackType
 from typing import (
     Any,
@@ -24,8 +25,9 @@ from typing import (
     Tuple,
 )
 
-from socket import SOCK_DGRAM, SOCK_STREAM
 import numpy as np
+
+import rasa.shared.utils.io
 import rasa.utils.io
 from rasa.constants import (
     DEFAULT_LOG_LEVEL_LIBRARIES,
@@ -36,7 +38,6 @@ from rasa.constants import (
 )
 from rasa.shared.constants import DEFAULT_LOG_LEVEL, ENV_LOG_LEVEL, TCP_PROTOCOL
 from rasa.shared.exceptions import RasaException
-import rasa.shared.utils.io
 
 logger = logging.getLogger(__name__)
 
@@ -153,7 +154,7 @@ def configure_logging_from_file(logging_config_file: Text) -> None:
     try:
         logging.config.dictConfig(logging_config_dict)
     except (ValueError, TypeError, AttributeError, ImportError) as e:
-        logging.debug(
+        logger.debug(
             f"The logging config file {logging_config_file} could not "
             f"be applied because it failed validation against "
             f"the built-in Python logging schema. "
