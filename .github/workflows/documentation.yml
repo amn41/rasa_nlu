@@ -30,7 +30,7 @@ env:
 jobs:
   changes:
     name: Check for file changes
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     # don't run this for pull requests of forks
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == 'RasaHQ/rasa'
     outputs:
@@ -59,7 +59,7 @@ jobs:
 
   evaluate_release_tag:
     name: Evaluate release tag
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     # don't run this for main branches of forks and on documentation branch
     if: github.repository == 'RasaHQ/rasa' && github.ref != 'refs/heads/documentation' && github.event_name != 'pull_request'
     outputs:
@@ -100,7 +100,7 @@ jobs:
 
   prebuild_docs:
     name: Prebuild Docs
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: [evaluate_release_tag]
     # don't run this for main branches of forks, would fail anyways
     if: github.repository == 'RasaHQ/rasa' && needs.evaluate_release_tag.outputs.build_docs == 'true' && github.ref != 'refs/heads/documentation' && github.event_name != 'pull_request'
@@ -189,7 +189,7 @@ jobs:
 
   preview_docs:
     name: Preview Docs
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: [changes]
     # don't run this for pull requests from forks
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == 'RasaHQ/rasa'
@@ -285,7 +285,7 @@ jobs:
 
   publish_docs:
     name: Publish Docs
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     # don't run this for main branches of forks; only run on documentation branch
     if: github.repository == 'RasaHQ/rasa' && github.ref == 'refs/heads/documentation'
 
