@@ -88,7 +88,7 @@ class CallbackNaturalLanguageGenerator(NaturalLanguageGenerator):
         )
 
         response = await self.nlg_endpoint.request(
-            method="post", json=body, timeout=DEFAULT_REQUEST_TIMEOUT
+            method="post", json=body
         )
 
         logger.debug(f"Received NLG response: {json.dumps(response)}")

@@ -17,7 +17,6 @@ import aiohttp
 import rasa.core
 from rasa.core.actions.constants import DEFAULT_SELECTIVE_DOMAIN, SELECTIVE_DOMAIN
 from rasa.core.constants import (
-    DEFAULT_REQUEST_TIMEOUT,
     COMPRESS_ACTION_SERVER_REQUEST_ENV_NAME,
     DEFAULT_COMPRESS_ACTION_SERVER_REQUEST,
 )
@@ -780,7 +779,6 @@ class RemoteAction(Action):
             response: Any = await self.action_endpoint.request(
                 json=modified_json if modified_json else json_body,
                 method="post",
-                timeout=DEFAULT_REQUEST_TIMEOUT,
                 compress=should_compress,
             )
             if modified_json:
